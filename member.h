@@ -46,7 +46,7 @@ struct ast_conf_soundq
 {
 	char name[256];
 	struct ast_filestream *stream; // the stream
-	int muted; // should incoming audio be muted while we play?
+	int stopped;
 	struct ast_conf_soundq *next;
 };
 
@@ -62,6 +62,7 @@ struct ast_conf_member
 	char* flags ;	// raw member-type flags
 	char type ;		// L = ListenOnly, M = Moderator, S = Standard (Listen/Talk)
 	char* conf_name ;		// name of the conference that own this member
+	int max_users ; // zero or max users for this conference
 
 	char *callerid;
 	char *callername;
@@ -79,7 +80,12 @@ struct ast_conf_member
 
 	// muting options - this member will not be heard/seen
 	int mute_audio;
+	int muted; // should incoming audio be muted while we play?
 	int mute_video;
+
+	// volume level adjustment for this member
+	int talk_volume;
+	int listen_volume;
 
 	// this member will not hear/see
 	int norecv_audio;
@@ -90,6 +96,7 @@ struct ast_conf_member
 
 	// is this person a moderator?
 	int ismoderator;
+	int kick_conferees;
 
 	// determine by flags and channel name
 	char connection_type ; // T = telephone, X = iaxclient, S = sip
@@ -151,6 +158,10 @@ struct ast_conf_member
 
 	// switch video by VAD?
 	short vad_switch;
+	// do a VAD switch even if video is not enabled?
+	short force_vad_switch;
+	// if member is current speaker, video will stay on it when it becomes silent
+	short vad_linger;
 	// switch by dtmf?
 	short dtmf_switch;
 	// relay dtmf to manager?
@@ -159,7 +170,14 @@ struct ast_conf_member
 	short first_frame_received;
 	// does text messages?
 	short does_text;
+	// conference does chat mode (1 on 1 video when two members in conference)
+	short does_chat_mode;
 
+	// Timeouts for VAD based video switching (in ms)
+	// Length of audio needed to decide that the member has started talking
+	int video_start_timeout;
+	// Length of silence needed to decide that the member has stopped talking
+	int video_stop_timeout;
 
 	// time we last dropped a frame
 	struct timeval last_in_dropped ;
@@ -176,6 +194,15 @@ struct ast_conf_member
 	short local_speaking_state; // This flag will be true only if this member is speaking
 	struct timeval last_state_change;
 	int speaker_count; // Number of drivers (including this member) that are speaking
+
+	// Stuff used to determine video broadcast state
+	// This member's video is sent out to at least one member of the conference
+	short video_broadcast_active;
+	// Time when we last sent out a video frame from this member
+	struct timeval last_video_frame_time;
+
+	// Is the member supposed to be transmitting video?
+	short video_started;
 
 	// pointer to next member in single-linked list
 	struct ast_conf_member* next ;
@@ -210,7 +237,6 @@ struct ast_conf_member
 	struct timeval lastsent_timeval ;
 
 	// flag indicating we should remove this member
-	short remove_flag ;
 	short kick_flag ;
 
 #if ( SILDET == 2 )
@@ -294,6 +320,12 @@ void member_process_spoken_frames(struct ast_conference* conf,
 void member_process_outgoing_frames(struct ast_conference* conf,
 				    struct ast_conf_member *member,
 				    struct conf_frame *send_frames);
+
+int is_video_eligible(struct ast_conf_member *member);
+
+// Member start and stop video methods
+void start_video(struct ast_conf_member *member);
+void stop_video(struct ast_conf_member *member);
 
 //
 // packer functions

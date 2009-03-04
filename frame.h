@@ -43,10 +43,10 @@
 //
 
 // mixing
-conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_count ) ;
+conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_count, int volume ) ;
 
-conf_frame* mix_multiple_speakers( conf_frame* frames_in, int speakers, int listeners ) ;
-conf_frame* mix_single_speaker( conf_frame* frames_in ) ;
+conf_frame* mix_multiple_speakers( conf_frame* frames_in, int speakers, int listeners, int volume ) ;
+conf_frame* mix_single_speaker( conf_frame* frames_in, int volume ) ;
 
 // frame creation and deletion
 conf_frame* create_conf_frame( struct ast_conf_member* member, conf_frame* next, const struct ast_frame* fr ) ;

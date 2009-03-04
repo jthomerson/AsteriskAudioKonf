@@ -31,7 +31,7 @@
 #include "asterisk/autoconfig.h"
 #include "frame.h"
 
-conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_count )
+conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_count, int volume )
 {
 	if ( frames_in == NULL )
 		return NULL ;
@@ -43,19 +43,19 @@ conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_c
 		if ( speaker_count == 2 && listener_count == 0 )
 		{
 			// optimize here also?
-			frames_out = mix_multiple_speakers( frames_in, speaker_count, listener_count ) ;
+			frames_out = mix_multiple_speakers( frames_in, speaker_count, listener_count, volume ) ;
 		}
 		else
 		{
 			// mix spoken frames for sending
 			// ( note: this call also releases us from free'ing spoken_frames )
-			frames_out = mix_multiple_speakers( frames_in, speaker_count, listener_count ) ;
+			frames_out = mix_multiple_speakers( frames_in, speaker_count, listener_count, volume ) ;
 		}
 	}
 	else if ( speaker_count == 1 )
 	{
 		// pass-through frames
-		frames_out = mix_single_speaker( frames_in ) ;
+		frames_out = mix_single_speaker( frames_in, volume ) ;
 		//printf("mix single speaker\n");
 	}
 	else
@@ -66,7 +66,7 @@ conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_c
 	return frames_out ;
 }
 
-conf_frame* mix_single_speaker( conf_frame* frames_in )
+conf_frame* mix_single_speaker( conf_frame* frames_in, int volume )
 {
 #ifdef APP_CONFERENCE_DEBUG
 	// ast_log( AST_CONF_DEBUG, "returning single spoken frame\n" ) ;
@@ -106,6 +106,11 @@ conf_frame* mix_single_speaker( conf_frame* frames_in )
 		frames_in->member->to_slinear,
 		frames_in->fr
 	) ;
+
+	if ( (frames_in->member->talk_volume != 0) || (volume != 0) )
+	{
+		ast_frame_adjust_volume(frames_in->fr, frames_in->member->talk_volume + volume);
+	}
 
 	// set the frame's member to null ( i.e. all listeners )
 	frames_in->member = NULL ;
@@ -153,7 +158,8 @@ void set_conf_frame_delivery( conf_frame* frame, struct timeval time )
 conf_frame* mix_multiple_speakers(
 	conf_frame* frames_in,
 	int speakers,
-	int listeners
+	int listeners,
+	int volume
 )
 {
 #ifdef APP_CONFERENCE_DEBUG
@@ -217,6 +223,11 @@ conf_frame* mix_multiple_speakers(
 				cf_spoken->member->to_slinear,
 				cf_spoken->fr
 			) ;
+
+			if (( cf_spoken->member->talk_volume != 0 ) || (volume != 0))
+			{
+				ast_frame_adjust_volume(cf_spoken->fr, cf_spoken->member->talk_volume + volume);
+			}
 
 			if ( cf_spoken->fr == NULL )
 			{

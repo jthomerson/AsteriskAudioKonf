@@ -335,6 +335,34 @@ static struct ast_cli_entry cli_mute = {
 	conference_mute_usage
 } ;
 
+int conference_muteconference( int fd, int argc, char *argv[] )
+{
+	if ( argc < 3 )
+		return RESULT_SHOWUSAGE ;
+
+	// get the conference name
+	const char* name = argv[2] ;
+
+	int res = mute_conference ( name );
+
+	if (res) ast_cli( fd, "Conference: %s muted\n", name) ;
+
+	return RESULT_SUCCESS ;
+}
+
+static char conference_muteconference_usage[] =
+	"usage: conference muteconference <conference_name>\n"
+	"       mute all members in a conference\n"
+;
+
+static struct ast_cli_entry cli_muteconference = {
+	{ "conference", "muteconference", NULL },
+	conference_muteconference,
+	"mute all members in a conference",
+	conference_muteconference_usage
+} ;
+
+
 int conference_mutechannel( int fd, int argc, char *argv[] )
 {
   	struct ast_conf_member *member;
@@ -351,7 +379,7 @@ int conference_mutechannel( int fd, int argc, char *argv[] )
 	    return RESULT_FAILURE;
 	}
 
-	member->mute_audio = 1;
+	member->muted = member->mute_audio = 1;
 	ast_mutex_unlock( &member->lock ) ;
 
 	ast_cli( fd, "Channel #: %s muted\n", argv[2]) ;
@@ -463,6 +491,33 @@ static struct ast_cli_entry cli_unmute = {
 	conference_unmute_usage
 } ;
 
+int conference_unmuteconference( int fd, int argc, char *argv[] )
+{
+	if ( argc < 3 )
+		return RESULT_SHOWUSAGE ;
+
+	// get the conference name
+	const char* name = argv[2] ;
+
+	int res = unmute_conference ( name );
+
+	if (res) ast_cli( fd, "Conference: %s unmuted\n", name) ;
+
+	return RESULT_SUCCESS ;
+}
+
+static char conference_unmuteconference_usage[] =
+	"usage: conference unmuteconference <conference_name>\n"
+	"       unmute all members in a conference\n"
+;
+
+static struct ast_cli_entry cli_unmuteconference = {
+	{ "conference", "unmuteconference", NULL },
+	conference_unmuteconference,
+	"unmute all members in a conference",
+	conference_unmuteconference_usage
+} ;
+
 int conference_unmutechannel( int fd, int argc, char *argv[] )
 {
 	struct ast_conf_member *member;
@@ -479,7 +534,7 @@ int conference_unmutechannel( int fd, int argc, char *argv[] )
 	    return RESULT_FAILURE;
 	}
 
-	member->mute_audio = 0;
+	member->muted = member->mute_audio = 0;
 	ast_mutex_unlock( &member->lock ) ;
 
 	ast_cli( fd, "Channel #: %s unmuted\n", argv[2]) ;
@@ -503,8 +558,8 @@ static struct ast_cli_entry cli_unmutechannel = {
 // play sound
 //
 static char conference_play_sound_usage[] =
-	"usage: conference play sound <channel-id> <sound-file> [mute]\n"
-	"       play sound <sound-file> to conference member <channel-id>.\n"
+	"usage: conference play sound <channel-id> (<sound-file>)+ [mute]\n"
+	"       play sound(s) (<sound-file>)+ to conference member <channel-id>.\n"
 	"       If mute is specified, all other audio is muted while the sound is played back.\n"
 ;
 
@@ -517,19 +572,19 @@ static struct ast_cli_entry cli_play_sound = {
 
 int conference_play_sound( int fd, int argc, char *argv[] )
 {
-	char *channel, *file;
+	char *channel,**file;
 	int mute = 0;
 
 	if ( argc < 5 )
 		return RESULT_SHOWUSAGE ;
 
 	channel = argv[3];
-	file = argv[4];
+	file = &argv[4];
 
-	if(argc > 5 && !strcmp(argv[5], "mute"))
+	if(argc > 5 && !strcmp(argv[argc-1], "mute"))
 	    mute = 1;
 
-	int res = play_sound_channel(fd, channel, file, mute);
+	int res = play_sound_channel(fd, channel, file, mute, (!mute) ? argc - 4 : argc - 5);
 
 	if ( !res )
 	{
@@ -571,6 +626,137 @@ int conference_stop_sounds( int fd, int argc, char *argv[] )
 		ast_cli(fd, "Sound stop failed failed\n");
 		return RESULT_FAILURE;
 	}
+	return RESULT_SUCCESS ;
+}
+
+//
+// adjust talk volume
+//
+
+static char conference_talkvolume_usage[] =
+	"usage: conference talkvolume <channel-id> ( up | down )\n"
+	"       adjust talk volume for conference member <channel-id>.\n"
+;
+
+static struct ast_cli_entry cli_talkvolume = {
+        { "conference", "talkvolume", NULL },
+        conference_talkvolume,
+        "adjust talk volume for a conference member",
+        conference_talkvolume_usage
+} ;
+
+int conference_talkvolume( int fd, int argc, char *argv[] )
+{
+	char *channel;
+	int up;
+
+	if ( argc < 4 )
+		return RESULT_SHOWUSAGE ;
+
+	channel = argv[2];
+
+	if ( strncasecmp( argv[3], "up", 2 ) == 0 )
+		up = 1 ;
+	else if ( strncasecmp( argv[3], "down", 4 ) == 0 )
+		up = 0 ;
+	else
+		return RESULT_SHOWUSAGE ;
+
+	int res = talk_volume_channel(fd, channel, up);
+
+	if ( !res )
+	{
+		ast_cli(fd, "Channel %s talk volume adjust failed\n", channel);
+		return RESULT_FAILURE;
+	}
+	return RESULT_SUCCESS ;
+}
+
+//
+// adjust listen volume
+//
+
+static char conference_listenvolume_usage[] =
+	"usage: conference listenvolume <channel-id> ( up | down )\n"
+	"       adjust listen volume for conference member <channel-id>.\n"
+;
+
+static struct ast_cli_entry cli_listenvolume = {
+        { "conference", "listenvolume", NULL },
+        conference_listenvolume,
+        "adjust listen volume for a conference member",
+        conference_listenvolume_usage
+} ;
+
+int conference_listenvolume( int fd, int argc, char *argv[] )
+{
+	char *channel;
+	int up;
+
+	if ( argc < 4 )
+		return RESULT_SHOWUSAGE ;
+
+	channel = argv[2];
+
+	if ( strncasecmp( argv[3], "up", 2 ) == 0 )
+		up = 1 ;
+	else if ( strncasecmp( argv[3], "down", 4 ) == 0 )
+		up = 0 ;
+	else
+		return RESULT_SHOWUSAGE ;
+
+	int res = listen_volume_channel(fd, channel, up);
+
+	if ( !res )
+	{
+		ast_cli(fd, "Channel %s listen volume adjust failed\n", channel);
+		return RESULT_FAILURE;
+	}
+	return RESULT_SUCCESS ;
+}
+
+//
+// adjust conference volume
+//
+
+static char conference_volume_usage[] =
+	"usage: conference volume <conference name> (up|down)\n"
+	"       raise or lower the conference volume.\n"
+;
+
+static struct ast_cli_entry cli_volume = {
+	{ "conference", "volume", NULL },
+	conference_volume,
+	"stops a conference",
+	conference_volume_usage
+} ;
+
+int conference_volume( int fd, int argc, char *argv[] )
+{
+	int up;
+
+	// check the args length
+	if ( argc < 4 )
+		return RESULT_SHOWUSAGE ;
+
+	// conference name
+	const char* conference = argv[2] ;
+
+	if ( strncasecmp( argv[3], "up", 2 ) == 0 )
+		up = 1 ;
+	else if ( strncasecmp( argv[3], "down", 4 ) == 0 )
+		up = 0 ;
+	else
+		return RESULT_SHOWUSAGE ;
+
+	int res =  volume(fd, conference, up );
+	
+	if ( !res )
+	{
+		ast_cli( fd, "Conference %s volume adjust failed\n", conference) ;
+		return RESULT_SHOWUSAGE ;
+	}
+
 	return RESULT_SUCCESS ;
 }
 
@@ -1162,13 +1348,18 @@ void register_conference_cli( void )
 	ast_cli_register( &cli_kick );
 	ast_cli_register( &cli_kickchannel );
 	ast_cli_register( &cli_mute );
+	ast_cli_register( &cli_muteconference );
 	ast_cli_register( &cli_mutechannel );
 	ast_cli_register( &cli_viewstream );
 	ast_cli_register( &cli_viewchannel );
 	ast_cli_register( &cli_unmute );
+	ast_cli_register( &cli_unmuteconference );
 	ast_cli_register( &cli_unmutechannel );
 	ast_cli_register( &cli_play_sound ) ;
 	ast_cli_register( &cli_stop_sounds ) ;
+	ast_cli_register( &cli_talkvolume ) ;
+	ast_cli_register( &cli_listenvolume ) ;
+	ast_cli_register( &cli_volume );
 	ast_cli_register( &cli_end );
 	ast_cli_register( &cli_lock );
 	ast_cli_register( &cli_lockchannel );
@@ -1198,13 +1389,18 @@ void unregister_conference_cli( void )
 	ast_cli_unregister( &cli_kick );
 	ast_cli_unregister( &cli_kickchannel );
 	ast_cli_unregister( &cli_mute );
+	ast_cli_unregister( &cli_muteconference );
 	ast_cli_unregister( &cli_mutechannel );
 	ast_cli_unregister( &cli_viewstream );
 	ast_cli_unregister( &cli_viewchannel );
 	ast_cli_unregister( &cli_unmute );
+	ast_cli_unregister( &cli_unmuteconference );
 	ast_cli_unregister( &cli_unmutechannel );
 	ast_cli_unregister( &cli_play_sound ) ;
 	ast_cli_unregister( &cli_stop_sounds ) ;
+	ast_cli_unregister( &cli_talkvolume ) ;
+	ast_cli_unregister( &cli_listenvolume ) ;
+	ast_cli_unregister( &cli_volume );
 	ast_cli_unregister( &cli_end );
 	ast_cli_unregister( &cli_lock );
 	ast_cli_unregister( &cli_lockchannel );

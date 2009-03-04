@@ -30,11 +30,23 @@ A member in a conference can be referred to by its id or by its channel.  Id is 
 - conference mute: mute member in a conference
   usage: conference mute <conference_name> <member id>
 
+- conference muteconference: mute all members in a conference
+  usage: conference muteconference <conference_name>
+
 - conference mutechannel: mute channel in a conference
   usage: conference mutechannel <channel>
 
+- conference talkvolume: raise or lower the talker's volume
+  usage: conference talkvolume <channel> (up|down)
+
+- conference listenvolume: raise or lower the listener's volume
+  usage: conference listenervolume <channel> (up|down)
+
+- conference volume: raise or lower the conference volume
+  usage: conference volume <conference name> (up|down)
+
 - conference play sound: play a sound to a conference member
-  usage: conference play sound <channel-id> <sound-file> [mute]
+  usage: conference play sound <channel-id> (<sound-file>)+ [mute]
   If mute is specified, all other audio is muted while the sound is played back.
 
 - conference restart: kick all users in all conferences
@@ -64,6 +76,9 @@ A member in a conference can be referred to by its id or by its channel.  Id is 
 
 - conference unmute: unmute member in a conference
   usage: conference unmute <conference_name> <member id>
+
+- conference unmuteconference: unmute members in a conference
+  usage: conference unmuteconference <conference_name>
 
 - conference unmutechannel: unmute channel in a conference
   usage: conference unmutechannel <channel>

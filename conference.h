@@ -54,7 +54,7 @@ typedef struct ast_conference_stats
 
 	// type of users
 	unsigned short moderators ;
-	unsigned short listeners ;
+	unsigned short conferees ;
 
 	// accounting data
 	unsigned long frames_in ;
@@ -70,6 +70,9 @@ struct ast_conference
 {
 	// conference name
 	char name[128] ;
+
+	// conference volume
+	int volume;
 
 	// single-linked list of members in conference
 	struct ast_conf_member* memberlist ;
@@ -94,8 +97,8 @@ struct ast_conference
 	// conference thread id
 	pthread_t conference_thread ;
 
-	// conference data mutex
-	ast_mutex_t lock ;
+	// conference data lock
+	ast_rwlock_t lock ;
 
 	// pointer to next conference in single-linked list
 	struct ast_conference* next ;
@@ -109,6 +112,12 @@ struct ast_conference
 	// keep track of current delivery time
 	struct timeval delivery_time ;
 
+	// the conference does chat mode: special treatment for situations with 1 and 2 members
+	short does_chat_mode;
+
+	// chat mode is on;
+	short chat_mode_on;
+	
 	// 1 => on, 0 => off
 	short debug_flag ;
 } ;
@@ -120,13 +129,10 @@ struct ast_conference
 // function declarations
 //
 
-struct ast_conference* start_conference( struct ast_conf_member* member ) ;
+int count_exec( struct ast_channel* chan, void* data ) ;
 
-void conference_exec( struct ast_conference* conf ) ;
+struct ast_conference* join_conference( struct ast_conf_member* member ) ;
 
-struct ast_conference* find_conf( const char* name ) ;
-struct ast_conference* create_conf( char* name, struct ast_conf_member* member ) ;
-void remove_conf( struct ast_conference* conf ) ;
 int end_conference( const char *name, int hangup ) ;
 
 // find a particular member, locking if requested.
@@ -136,14 +142,9 @@ int queue_frame_for_listener( struct ast_conference* conf, struct ast_conf_membe
 int queue_frame_for_speaker( struct ast_conference* conf, struct ast_conf_member* member, conf_frame* frame ) ;
 int queue_silent_frame( struct ast_conference* conf, struct ast_conf_member* member ) ;
 
-int get_new_id( struct ast_conference *conf );
-void add_member( struct ast_conf_member* member, struct ast_conference* conf ) ;
 int remove_member( struct ast_conf_member* member, struct ast_conference* conf ) ;
-int count_member( struct ast_conf_member* member, struct ast_conference* conf, short add_member ) ;
 
-void do_VAD_switching(struct ast_conference *conf);
 int send_text_message_to_member(struct ast_conf_member *member, const char *text);
-void do_video_switching(struct ast_conference *conf, int new_id, int lock);
 
 // called by app_confernce.c:load_module()
 void init_conference( void ) ;
@@ -158,8 +159,8 @@ int kick_channel ( const char *confname, const char *channel);
 int kick_all ( void );
 int mute_member ( const char* confname, int user_id);
 int unmute_member ( const char* confname, int user_id);
-int mute_channel ( const char* confname, const char* user_chan);
-int unmute_channel ( const char* confname, const char* user_chan);
+int mute_conference ( const char* confname);
+int unmute_conference ( const char* confname);
 int viewstream_switch ( const char* confname, int user_id, int stream_id);
 int viewchannel_switch ( const char* confname, const char* user_chan, const char* stream_chan);
 
@@ -185,8 +186,12 @@ int send_text_broadcast(const char *conference, const char *text);
 int drive(const char *conference, int src_member_id, int dst_member_id);
 int drive_channel(const char *conference, const char *src_channel, const char *dst_channel);
 
-int play_sound_channel(int fd, const char *channel, const char *file, int mute);
+int play_sound_channel(int fd, const char *channel, char **file, int mute, int n);
 int stop_sound_channel(int fd, const char *channel);
+
+int talk_volume_channel(int fd, const char *channel, int up);
+int listen_volume_channel(int fd, const char *channel, int up);
+int volume(int fd, const char *conference, int up);
 
 int set_conference_debugging( const char* name, int state ) ;
 

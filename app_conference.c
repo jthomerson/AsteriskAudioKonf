@@ -56,6 +56,10 @@ static char *app = "Conference";
 static char *synopsis = "Channel Independent Conference";
 static char *descrip = "Channel Independent Conference Application";
 
+static char *app2 = "ConferenceCount";
+static char *synopsis2 = "Channel Independent Conference Count";
+static char *descrip2 = "Channel Independent Conference Count Application";
+
 static int app_conference_main(struct ast_channel* chan, void* data)
 {
 	int res ;
@@ -71,26 +75,51 @@ static int app_conference_main(struct ast_channel* chan, void* data)
 	return res ;
 }
 
+static int app_conferencecount_main(struct ast_channel* chan, void* data)
+{
+	int res ;
+	struct ast_module_user *u ;
+
+	u = ast_module_user_add(chan);
+
+	// call count thread function
+	res = count_exec( chan, data ) ;
+
+	ast_module_user_remove(u);
+
+	return res ;
+}
+
 static int unload_module( void )
 {
+	int res = 0;
+
 	ast_log( LOG_NOTICE, "unloading app_conference module\n" ) ;
 
 	ast_module_user_hangup_all();
 
 	unregister_conference_cli() ;
 
-	return ast_unregister_application( app ) ;
+	res |= ast_unregister_application( app ) ;
+	res |= ast_unregister_application( app2 ) ;
+
+	return res ;
 }
 
 static int load_module( void )
 {
+	int res = 0;
+
 	ast_log( LOG_NOTICE, "Loading app_conference module, revision=%s\n", revision) ;
 
 	init_conference() ;
 
 	register_conference_cli() ;
 
-	return ast_register_application( app, app_conference_main, synopsis, descrip ) ;
+	res |= ast_register_application( app, app_conference_main, synopsis, descrip ) ;
+	res |= ast_register_application( app2, app_conferencecount_main, synopsis2, descrip2 ) ;
+
+	return res ;
 }
 
 // increment a timeval by ms milliseconds
