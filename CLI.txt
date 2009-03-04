@@ -1,0 +1,96 @@
+Current command line used by app_conference
+Please note that app_conference is still work in progress, so this document might be outdated. As always, the source code is the definitive reference (cli.[ch] and conference.[ch]).  You can also obtain help/usage information by using Asterisk CLI help system ("help conference")
+
+A member in a conference can be referred to by its id or by its channel.  Id is a positive number assigned automatically when the member joins the conference.  Channel is Asterisk channel identifier. To obtain a list of member ids and channels in a conference, do:
+
+*CLI> conference list <conference name>
+
+
+- conference debug: enable debugging for a conference
+  usage: conference debug <conference_name> [ on | off ]
+
+- conference end: stops a conference
+  usage: conference end <conference name>
+
+- conference kick: kick member from a conference
+  usage: conference kick <conference_name> <member id>
+
+- conference kickchannel: kick channel from a conference
+  usage: conference kickchannel <conference_name> <channel>
+
+- conference list: list members of a conference. If no conference is specified, all conferences are listed
+  usage: conference list {conference_name}
+
+- conference lock: locks incoming video to a member
+  usage: conference lock <conference name> <member id>
+
+- conference lockchannel: locks incoming video to a channel
+  usage: conference lockchannel <conference name> <channel>
+
+- conference mute: mute member in a conference
+  usage: conference mute <conference_name> <member id>
+
+- conference mutechannel: mute channel in a conference
+  usage: conference mutechannel <channel>
+
+- conference play sound: play a sound to a conference member
+  usage: conference play sound <channel-id> <sound-file> [mute]
+  If mute is specified, all other audio is muted while the sound is played back.
+
+- conference restart: kick all users in all conferences
+  usage: conference restart
+  
+- conference set default: sets default video source
+  usage: conference set default <conference name> <member>
+  use a negative value for member if you want to clear the default
+
+- conference set defaultchannel: sets default video source channel
+  usage: conference set defaultchannel <conference name> <channel>
+
+- conference show stats: show conference stats
+  usage: conference show stats
+
+- conference text: sends a text message to a member. Depends on the member's channel capabilities.
+  usage: conference text <conference name> <member> <text>
+
+- conference textbroadcast: sends a text message to all members in a conference
+  usage: conference textbroadcast <conference name> <text>
+
+- conference textchannel: sends a text message to a channel
+  usage: conference textchannel <conference name> <channel> <text>
+
+- conference unlock: unlocks incoming video
+  usage: conference unlock <conference name>
+
+- conference unmute: unmute member in a conference
+  usage: conference unmute <conference_name> <member id>
+
+- conference unmutechannel: unmute channel in a conference
+  usage: conference unmutechannel <channel>
+
+- conference video mute: mutes video from a member
+  usage: conference video mute <conference name> <member>
+
+- conference video mutechannel: mutes video from a channel
+  usage: conference video mutechannel <conference name> <channel>
+
+- conference video unmute: unmutes video from a member
+  usage: conference video unmute <conference name> <member>
+
+- conference video unmutechannel: unmutes video from a channel
+  usage: conference video unmutechannel <conference name> <channel>
+
+- conference viewchannel: switch video for a channel in a conference
+  usage: conference viewchannel <conference_name> <dest channel> <src channel>
+
+- conference viewstream: switch video for a member a conference
+  usage: conference viewstream <conference_name> <member id> <stream no>
+
+- conference drive: drive VAD video switching of destination member using audio from source member
+  usage: conference drive <conference name> <source member> [destination member]
+  If destination member is missing or negative, break existing connection
+
+- conference drivechannel: drive VAD video switching of destination channel using audio from source channel
+  usage: conference drivechannel <conference name> <source channel> [destination channel]
+  If destination channel is missing, break existing connection
+ 

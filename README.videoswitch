@@ -1,0 +1,87 @@
+VideoSwitch
+-----------
+(c) Vipadia Limited 2005-2006
+Neil Stratford <neils@vipadia.com>
+
+Based on app_conference, see README.
+
+Including contributions from John Martin <John.Martin@AuPix.com>
+
+Example use:
+
+exten => 2300,1,Videoswitch(test/RX)
+
+This puts the user into a conference 'test' with the options SRX.
+
+The options are the same as app_conference, except:
+
+X - enable the caller to switch video stream using DTMF
+R - relay the DTMF to the management interface
+C - Mute video - no video from this client
+c - No Receive video - send no video to this client
+L - Mute audio - no audio from this client
+l - No Receive audio - send no audio to this client
+M - member is moderator - when they leave everyone else is kicked
+
+Stream selection options: two integers, first is receive id, second is send id.
+Both are optional.
+
+0-9 - Set initial receive stream to n
+0-9 - Set this stream id to n (will stop any other video with that id already) 
+
+eg: Videoswitch(test/01) will set our id to 1, and we will receive id 0's video
+
+CLI commands (which may also be invoked from the manager interface
+using the Command action):
+
+Most commands have two versions, which can either take a member number (obtained from 'videoswitch list') or a channel identifier (such as SIP/2304-1e82).
+
+fidwell*CLI> help videoswitch
+        videoswitch debug  enable debugging for a videoswitch
+         videoswitch kick  kick member from a videoswitch
+         videoswitch list  list members of a videoswitch
+         videoswitch mute  mute member in a videoswitch
+  videoswitch mutechannel  mute channel in a videoswitch
+   videoswitch show stats  show videoswitch stats
+       videoswitch unmute  unmute member in a videoswitch
+videoswitch unmutechannel  unmute channel in a videoswitch
+  videoswitch viewchannel  switch channel in a videoswitch
+   videoswitch viewstream  switch view in a videoswitch
+
+fidwell*CLI> help videoswitch debug 
+usage: videoswitch debug <videoswitch_name> [ on | off ]
+       enable debugging for a videoswitch
+
+fidwell*CLI> help videoswitch kick
+usage: videoswitch kick <videoswitch_name> <member no>
+       kick member form a videoswitch
+
+fidwell*CLI> help videoswitch list
+usage: videoswitch list {<videoswitch_name>}
+       list members of a videoswitch or list of videoswitches if no name
+
+fidwell*CLI> help videoswitch mute
+usage: videoswitch mute <videoswitch_name> <member no>
+       mute member in a videoswitch
+
+fidwell*CLI> help videoswitch unmute
+usage: videoswitch unmute <videoswitch_name> <member no>
+       unmute member in a videoswitch
+
+fidwell*CLI> help videoswitch mutechannel
+usage: videoswitch mute <videoswitch_name> <channel>
+       mute channel in a videoswitch
+
+fidwell*CLI> help videoswitch unmutechannel
+usage: videoswitch unmute <videoswitch_name> <channel>
+       unmute channel in a videoswitch
+
+fidwell*CLI> help videoswitch viewchannel
+usage: videoswitch viewchannel <videoswitch_name> <dest channel> <src channel>
+       channel <dest channel> will receive video stream <src channel>
+
+fidwell*CLI> help videoswitch viewstream
+usage: videoswitch viewstream <videoswitch_name> <member no> <stream no>
+       member <member no> will receive video stream <stream no>
+
+

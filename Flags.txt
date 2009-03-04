@@ -1,0 +1,31 @@
+Current dialplan flags used by app_conference
+Please note that app_conference is still work in progress, so this document might be outdated. As always, the source code is the definitive reference (member.c in create_member())
+
+Mute/no receive options:
+'C' : member starts with video muted
+'c' : member starts unable to receive video
+'L' : member starts with audio muted
+'l' : member starts unable to receive audio
+
+Speex preprocessing options (right now app_conference does preprocessing only for Zaptel members):
+'V' : enable speex preprocessing Voice Activity Detection 
+'D' : enable speex preprocessing De-noise
+'A' : enable speex preprocessing Automatic Gain Control
+'T' : member connects through Zaptel, so speex preprocessing should be enabled
+
+DTMF options:
+'X' : enable DTMF switch: video can be switched by users using DTMF. Do not use with 'S'.
+'R' : enable DTMF relay: DTMF tones generate a manager event
+If neither 'X' nor 'R' are present, DTMF tones will be forwarded to all members in the conference
+
+Moderator/video switch options:
+'M' : member is a "moderator". When a moderator quits, all members are kicked and the conference is disabled.
+'S' : member accepts VAD controlled video switching.  Do not use with 'X'.
+
+Miscellaneous:
+'t' : member accepts text based control messages.  The messages are described in a separate document
+'N' : Assume that the member starts off with camera disabled.
+
+Future development (these are not implemented yet):
+'x' : marked member.  We plan to change the behavior so that when ALL moderators quit, all members that are marked will get kicked. Other members in the conference are not affected.
+
