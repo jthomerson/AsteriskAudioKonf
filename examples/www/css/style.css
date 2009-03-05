@@ -1,0 +1,130 @@
+html, body {
+height: 100%;
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	background: #CCCCCC url(../img/bg.jpg) repeat-x top;
+	font-family:Arial, Helvetica, sans-serif;
+}
+
+#container {
+	width:900px;
+	margin:67px auto;
+	background:#CCCCCC url(../img/content_bg.jpg) repeat-y;
+	height: 100%;
+	position:absolute;
+	left: 50%;
+	margin-left:  -450px;
+
+}
+
+#conference {
+}
+
+#mainTable {
+	width:870px;
+	margin:10px auto 0 25px;
+	padding:4px;
+}
+
+#logo {
+	width:695px;
+	height:50px;
+	background:url(../img/logo.gif) no-repeat;
+	margin:0 auto;
+}
+
+.tableHeader {
+	font-style: normal;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+	background:#115AA7;
+	font-size:14px;
+}
+
+.tableHeaderLeft {
+	background:#115AA7 url(../img/top_left.jpg) no-repeat top left;
+	font-style: normal;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+	font-size:14px;
+}
+
+.tableHeaderRight {
+	background:#115AA7 url(../img/top_right.jpg) no-repeat top right;
+	font-style: normal;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+	font-size:14px;
+}
+
+.RowOdd {
+	font-weight: bold;
+	color: #000066;
+	text-decoration: none;
+	background-color: #FFFFFF;
+	cursor:pointer;
+	font-size:12px;
+}
+.RowEven {
+	font-weight: bold;
+	text-decoration:none;
+	color: #000066;
+	background: #EBEBEB;
+	cursor:pointer;
+	font-size:12px;
+}
+
+.tooltip{
+position:absolute;
+left:-2000px;
+background-color:#dedede;
+padding:5px;
+border:1px solid #fff;
+width:auto;
+}
+
+.tooltip p{
+margin:0;
+padding:0;
+color:#fff;
+background-color:#222;
+padding:2px 7px;
+}
+
+#sideTab {
+	height:166px;
+	width:43px;
+	background:url(../img/sidetabh.gif) no-repeat;
+	position:absolute;
+	top:130px;
+	left:50%;
+	margin-left:450px;
+	cursor:pointer;
+}
+
+#sideTab:hover {
+	background:url(../img/sidetab.gif) no-repeat;
+}
+
+#footer {
+	width:100%;
+	height:30px;
+	position: absolute;
+	bottom: 0px;
+	margin:0 0 -117px 0;
+	background:#115AA7;
+	text-align:center;
+	font-size:18px;
+	line-height:30px;
+}
+
+#footer a {
+	color:#FFFFFF;
+	text-decoration:none;
+}
