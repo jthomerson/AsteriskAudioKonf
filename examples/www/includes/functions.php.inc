@@ -152,7 +152,7 @@ function muteConference($conference) {
 		$fp = managerConnect();
 	        $conference = trim($conference);
         	fputs($fp,"Action: Command\r\n");
-	        fputs($fp,"Command: conference muteconference $conference\r\n\r\n");
+	        fputs($fp,"Command: konference muteconference $conference\r\n\r\n");
         	fputs($fp,"action: logoff\r\n");
 	        fputs($fp,"\r\n");
 	}
@@ -163,7 +163,7 @@ function unmuteConference($conference) {
 		$fp = managerConnect();
 	        $conference = trim($conference);
         	fputs($fp,"Action: Command\r\n");
-	        fputs($fp,"Command: conference unmuteconference $conference\r\n\r\n");
+	        fputs($fp,"Command: konference unmuteconference $conference\r\n\r\n");
         	fputs($fp,"action: logoff\r\n");
 	        fputs($fp,"\r\n");
 	}
@@ -173,7 +173,7 @@ function kickUser($conference,$channel) {
 	$fp = managerConnect();
         $conference = trim($conference);
        	fputs($fp,"Action: Command\r\n");
-        fputs($fp,"Command: conference kickchannel $conference $channel\r\n\r\n");
+        fputs($fp,"Command: konference kickchannel $conference $channel\r\n\r\n");
        	fputs($fp,"action: logoff\r\n");
         fputs($fp,"\r\n");
 }
@@ -181,7 +181,7 @@ function kickUser($conference,$channel) {
 function volumeDown($channel) {
 	$fp = managerConnect();
        	fputs($fp,"Action: Command\r\n");
-        fputs($fp,"Command: conference talkvolume $channel down\r\n\r\n");
+        fputs($fp,"Command: konference talkvolume $channel down\r\n\r\n");
        	fputs($fp,"action: logoff\r\n");
         fputs($fp,"\r\n");
 }
@@ -189,7 +189,7 @@ function volumeDown($channel) {
 function volumeUp($channel) {
 	$fp = managerConnect();
        	fputs($fp,"Action: Command\r\n");
-        fputs($fp,"Command: conference talkvolume $channel up\r\n\r\n");
+        fputs($fp,"Command: konference talkvolume $channel up\r\n\r\n");
        	fputs($fp,"action: logoff\r\n");
         fputs($fp,"\r\n");
 }
@@ -216,13 +216,13 @@ function muteUser($db,$channel) {
 
 	if ($muted == 1) {
 	       	fputs($fp,"Action: Command\r\n");
-        	fputs($fp,"Command: conference unmutechannel $channel\r\n\r\n");
+        	fputs($fp,"Command: konference unmutechannel $channel\r\n\r\n");
 	       	fputs($fp,"action: logoff\r\n");
         	fputs($fp,"\r\n");
 		changeMute($db,$channel,0);
 	} else if ($muted == 0) {
 	       	fputs($fp,"Action: Command\r\n");
-        	fputs($fp,"Command: conference mutechannel $channel\r\n\r\n");
+        	fputs($fp,"Command: konference mutechannel $channel\r\n\r\n");
 	       	fputs($fp,"action: logoff\r\n");
         	fputs($fp,"\r\n");
 		changeMute($db,$channel,1);
@@ -290,7 +290,7 @@ function recordConference($db,$conference) {
 		}
 		if ($channel != "") {
 	        	fputs($fp,"Action: Command\r\n");
-	        	fputs($fp,"Command: conference kickchannel $conference $channel\r\n\r\n");
+	        	fputs($fp,"Command: konference kickchannel $conference $channel\r\n\r\n");
         		fputs($fp,"action: logoff\r\n");
 		        fputs($fp,"\r\n");
 		} else {

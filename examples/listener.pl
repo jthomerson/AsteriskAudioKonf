@@ -150,11 +150,11 @@ sub ConferenceDTMF {
 	if ($key == 1) {
 		if ($muted == 0) {
 			setMute($channel,1);
-			command("Action: Command${EOL}Command: conference stop sounds $channel${BLANK}Action: Command${EOL}Command: conference mutechannel $channel${BLANK}Action: Command${EOL}Command: conference play sound $channel conf-muted mute${BLANK}");
+			command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference mutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-muted mute${BLANK}");
 		}
 		if ($muted == 1) {
 			setMute($channel,0);
-			command("Action: Command${EOL}Command: conference stop sounds $channel${BLANK}Action: Command${EOL}Command: conference unmutechannel $channel${BLANK}Action: Command${EOL}Command: conference play sound $channel conf-unmuted mute${BLANK}");
+			command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference unmutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-unmuted mute${BLANK}");
 		}
 
 	}	
@@ -169,7 +169,7 @@ sub ConferenceDTMF {
 					$rec_found = $row[0];
 			        }
 				if ($rec_found ne "") {
-					command("Action: Command${EOL}Command: conference kickchannel $conference $rec_found${BLANK}");			
+					command("Action: Command${EOL}Command: konference kickchannel $conference $rec_found${BLANK}");			
 				} else {
 					mkdir($recording_location,022);
 					chown($recording_uid, $recording_gid, $recording_location);
@@ -179,24 +179,24 @@ sub ConferenceDTMF {
 		}
 	}
 	if ($key == 0) {
-		command("Action: Command${EOL}Command: conference kickchannel $conference $channel${BLANK}");
+		command("Action: Command${EOL}Command: konference kickchannel $conference $channel${BLANK}");
 	}
 	if ($key == 5) {
 		if ($flags =~ /M/) {
-			command("Action: Command${EOL}Command: conference muteconference $conference${BLANK}");
+			command("Action: Command${EOL}Command: konference muteconference $conference${BLANK}");
 		}
 	}
 	if ($key == 4) {
-			command("Action: Command${EOL}Command: conference volume $conference down${BLANK}");
+			command("Action: Command${EOL}Command: konference volume $conference down${BLANK}");
 	}
 	if ($key == 6) {
-			command("Action: Command${EOL}Command: conference volume $conference up${BLANK}");
+			command("Action: Command${EOL}Command: konference volume $conference up${BLANK}");
 	}
 	if ($key == 7) {
-			command("Action: Command${EOL}Command: conference talkvolume $conference up${BLANK}");
+			command("Action: Command${EOL}Command: konference talkvolume $conference up${BLANK}");
 	}
 	if ($key == 9) {
-			command("Action: Command${EOL}Command: conference talkvolume $conference down${BLANK}");
+			command("Action: Command${EOL}Command: konference talkvolume $conference down${BLANK}");
 	}
 
 	$key = "";	
@@ -313,7 +313,7 @@ sub playcount {
         $count = shift;
         $channel = shift;
         $files = getCountFiles($count);
-        command("Action: Command${EOL}Command: conference stop sounds $channel${BLANK}Action: Command${EOL}Command: conference play sound $channel $files mute${BLANK}");
+        command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel $files mute${BLANK}");
 }
 
 
@@ -344,7 +344,7 @@ sub start_recording {
 	chown($recording_uid, $recording_gid, $recording_location);
 	touch($RECORDINGFILE . ".wav");
 	chown($recording_uid, $recording_gid, $RECORDINGFILE . ".wav");
-	$cmd = "Action: Command${EOL}Command: conference stop sounds $channel${BLANK}";
+	$cmd = "Action: Command${EOL}Command: konference stop sounds $channel${BLANK}";
 	$cmd .= "Action: Originate${EOL}";
 	$cmd .= "Channel: Local/recorder\@conference${EOL}";
 	$cmd .= "MaxRetries: 0${EOL}";
