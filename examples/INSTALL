@@ -1,0 +1,220 @@
+Asterikast Conference Manager Version 1.0
+Written By:
+	John Hass john@asterikast.com
+	Tony Virelli tony@asterikast.com
+======================================================
+Building Instructions:
+Required Packages:
+	Asterisk 1.4 series
+	Custom appconference
+	Database Engine (SQLite 3 or MySQL)
+	Perl
+	Perl Modules:
+		DBD::SQLite
+		Math::Round
+		File::Touch
+
+
+Slackware 12.2
+	Run as root
+	I did the full install using the slackware 12.2 DVD disk
+	git clone http://git.xiph.org/speex.git
+	cd speex
+		./autogen.sh
+		./configure --prefix=/usr
+		make
+		make install-strip
+		cd ../
+	perl -MCPAN -e shell
+		install DBD::SQLite <- install failed for me... No Biggie...
+			cp /root/.cpan/sources/authors/id/M/MS/MSERGEANT/DBD-SQLite-1.14.tar.gz .
+			cd DBD-SQLite-1.14
+				perl Makefile.PL
+				make
+				make install
+				cd ../
+		install Math::Round
+		install File::Touch
+		quit
+	wget http://iksemel.googlecode.com/files/iksemel-1.3.tar.gz
+	tar -zxvf iksemel-1.3.tar.gz
+	cd iksemel-1.3
+		./configure --prefix=/usr
+		make
+		make install-strip
+		cd ../
+
+	Installing Asterisk:
+	svn checkout http://svn.digium.com/svn/asterisk/branches/1.4 asterisk-1.4
+	svn checkout http://svn.digium.com/svn/asterisk-addons/branches/1.4 asterisk-addons-1.4
+	cd asterisk-1.4
+		./configure
+		make menuselect
+			save the file (press s)
+		make
+		make install			
+		make samples
+		cd ../
+	cd asterisk-addons-1.4
+		./configure
+		make menuselect
+			select "Channel Drivers" (press enter)
+			unselect "chan_ooh323" (press space bar)
+			press the left arrow
+			press s to save
+		make
+		make install
+		make samples
+		cd ../
+
+        Installing SQLite3 PHP Modules
+        wget http://voxel.dl.sourceforge.net/sourceforge/php-sqlite3/sqlite3-0.5.tgz
+        tar -zxvf sqlite3-0.5.tgz
+                cd sqlite3-0.5
+                phpize
+                ./configure
+                make
+                make install
+                cd ../
+        edit /etc/httpd/php.ini (I use nano /etc/httpd/php.ini)
+                find the line that shows "Dynamic Extensions (around line 657 press ctrl +c to find out your line number"
+                under the comments add: extension=sqlite3.so save the file and exit
+		nano /etc/httpd/httpd.conf
+		uncomment line 476:
+			#Include /etc/httpd/mod_php.conf
+			to
+			Include /etc/httpd/mod_php.conf
+		chmod +x /etc/rc.d/rc.httpd
+                /etc/rc.d/rc.httpd start
+	cp -r ~/asterikast-conference-manager-1.0/www/* /var/www/htdocs/ (assuming you uncompressed in your home directory)
+	chown -R www-data:www-data /var/www/*
+	cp ~/asterikast-conference-manager-1.0/src/asterikast.pl /usr/bin/
+	edit the /usr/bin/asterikast.pl
+	if your using sqlite: (ensure permissions)
+		my $owner = "apache";
+		my $group = "apache";
+	start asterisk
+		safe_asterisk
+	load the manager.conf changes. if this is a new install:
+		cp ~/asterikast-conference-manager-1.0/asterisk/manager.conf /etc/asterisk/manager.conf	
+	reload asterisk
+		asterisk -rx "module reload"	
+	start the listener
+		asterisk.pl
+	if all went well you should see something like this:
+		asterisk -rx "manager show connected"
+		  Username         IP Address     
+		  asterikast       127.0.0.1    
+	this means the listener is listening
+	if this is a new install copy the extensions.conf and asterikast.conf
+	cp ~/asterikast-conference-manager-1.0/asterisk/extensions.conf /etc/asterisk/
+	cp ~/asterikast-conference-manager-1.0/asterisk/asterikast.conf /etc/asterisk/
+	reload asterisk
+	asterisk -rx "module reload"
+	****Last Step****
+	Install the binary of app_conference.so
+		install ~/asterikast-conference-manager-1.0/modules/app_conference.so /usr/lib/asterisk/modules/app_conference.so
+	load asterisk cli
+		asterisk -r
+			module load app_conference.so
+					
+		
+		
+Gentoo
+	TODO
+Ubuntu Server 8.10
+	Run as root
+	I usually run sudo su -
+	Ubuntu Packages:
+	apt-get install libspeex-dev
+	apt-get install libspeexdsp-dev
+	apt-get install libcurl4-openssl-dev
+	apt-get install build-essential
+	apt-get install subversion
+ 	apt-get install libsqlite3-dev
+	apt-get install libncurses-dev
+	apt-get install libiksemel-dev
+	apt-get install libdbi-perl
+	apt-get install libmath-round-perl
+	apt-get install libfile-touch-perl
+	apt-get install libdbd-sqlite3-perl
+	apt-get install apache2
+	apt-get install php5
+	apt-get install php5-dev
+
+
+	Installing Asterisk:
+	svn checkout http://svn.digium.com/svn/asterisk/branches/1.4 asterisk-1.4
+	svn checkout http://svn.digium.com/svn/asterisk-addons/branches/1.4 asterisk-addons-1.4
+	cd asterisk-1.4
+		./configure
+		make menuselect
+			save the file (press s)
+		make
+		make install			
+		make samples
+		cd ../
+	cd asterisk-addons-1.4
+		./configure
+		make menuselect
+			select "Channel Drivers" (press enter)
+			unselect "chan_ooh323" (press space bar)
+			press the left arrow
+			press s to save
+		make
+		make install
+		make samples
+		cd ../
+
+	Installing SQLite3 PHP Modules
+	wget http://voxel.dl.sourceforge.net/sourceforge/php-sqlite3/sqlite3-0.5.tgz
+	tar -zxvf sqlite3-0.5.tgz
+		cd sqlite3-0.5
+		phpize5
+		./configure
+		make
+		make install
+		cd ../
+	edit /etc/php5/apache2/php.ini (I use nano)
+		find the line that shows "Dynamic Extensions"
+		under the comments add: sqlite3.so save the file and exit
+		/etc/init.d/apache2/restart
+	
+	****Almost Done****
+	cp -r ~/asterikast-conference-manager-1.0/www/* /var/www/ (assuming you uncompressed in your home directory)
+	chown -R www-data:www-data /var/www/*
+	cp ~/asterikast-conference-manager-1.0/src/asterikast.pl /usr/bin/
+	edit the /usr/bin/asterikast.pl
+	if your using sqlite: (ensure permissions)
+		my $owner = "www-data";
+		my $group = "www-data";
+	edit the safe_asterisk file:
+		nano /usr/sbin/safe_asterisk
+		change /bin/sh to /bin/bash
+	start asterisk
+		safe_asterisk
+	load the manager.conf changes. if this is a new install:
+		cp ~/asterikast-conference-manager-1.0/asterisk/manager.conf /etc/asterisk/manager.conf	
+	reload asterisk
+		asterisk -rx "module reload"	
+	start the listener
+		asterisk.pl
+	if all went well you should see something like this:
+		asterisk -rx "manager show connected"
+		  Username         IP Address     
+		  asterikast       127.0.0.1    
+	this means the listener is listening
+	if this is a new install copy the extensions.conf and asterikast.conf
+	cp ~/asterikast-conference-manager-1.0/asterisk/extensions.conf /etc/asterisk/
+	cp ~/asterikast-conference-manager-1.0/asterisk/asterikast.conf /etc/asterisk/
+	reload asterisk
+	asterisk -rx "module reload"
+	****Last Step****
+	Install the binary of app_conference.so
+		install ~/asterikast-conference-manager-1.0/modules/app_conference.so /usr/lib/asterisk/modules/app_conference.so
+	load asterisk cli
+		asterisk -r
+			module load app_conference.so
+
+	That's it you should be able to browse to:
+		http://server/index.php
