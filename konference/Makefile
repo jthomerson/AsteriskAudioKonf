@@ -27,6 +27,15 @@ REVISION = $(shell svnversion -n .)
 # turn app_konference debugging on or off ( 0 == OFF, 1 == ON )
 APP_CONFERENCE_DEBUG ?= 0
 
+# turn app_konference texting on of off ( 0 == OFF, 1 == ON )
+TEXT ?= 0
+
+# turn app_konference video on of off ( 0 == OFF, 1 == ON )
+VIDEO ?= 0
+
+# turn app_konference dtmf on of off ( 0 == OFF, 1 == ON )
+DTMF ?= 0
+
 # 0 = OFF 1 = astdsp 2 = speex
 SILDET := 2
 
@@ -72,6 +81,18 @@ CPPFLAGS += -DCRYPTO
 
 ifeq ($(APP_CONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_CONFERENCE_DEBUG
+endif
+
+ifeq ($(TEXT), 1)
+CPPFLAGS += -DTEXT
+endif
+
+ifeq ($(VIDEO), 1)
+CPPFLAGS += -DVIDEO
+endif
+
+ifeq ($(DTMF), 1)
+CPPFLAGS += -DDTMF
 endif
 
 #

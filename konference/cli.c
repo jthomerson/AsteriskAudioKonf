@@ -503,7 +503,7 @@ char *conference_mutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 
 	return SUCCESS ;
 }
-
+#ifdef	VIDEO
 //
 //  viewstream
 //
@@ -583,7 +583,7 @@ char *conference_viewchannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 
 	return SUCCESS ;
 }
-
+#endif
 //
 // unmute member <member id>
 //
@@ -1058,7 +1058,7 @@ char *conference_end(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a) {
 
 	return SUCCESS ;
 }
-
+#ifdef	VIDEO
 //
 // lock conference to a video source
 //
@@ -1441,8 +1441,8 @@ char *conference_video_unmutechannel(struct ast_cli_entry *e, int cmd, struct as
 
 	return SUCCESS;
 }
-
-
+#endif
+#ifdef	TEXT
 //
 // Text message functions
 // Send a text message to a member
@@ -1572,7 +1572,8 @@ char *conference_textbroadcast(struct ast_cli_entry *e, int cmd, struct ast_cli_
 
 	return SUCCESS;
 }
-
+#endif
+#ifdef	VIDEO
 //
 // Associate two members
 // Audio from the source member will drive VAD based video switching for the destination member
@@ -1669,7 +1670,7 @@ char *conference_drivechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_a
 
 	return SUCCESS;
 }
-
+#endif
 
 //
 // cli initialization function
@@ -1686,8 +1687,10 @@ static struct ast_cli_entry app_konference_commands[] = {
 	AST_CLI_DEFINE(conference_mute, conference_mute_summary),
 	AST_CLI_DEFINE(conference_muteconference, conference_muteconference_summary),
 	AST_CLI_DEFINE(conference_mutechannel, conference_mutechannel_summary),
+#ifdef	VIDEO
 	AST_CLI_DEFINE(conference_viewstream, conference_viewstream_summary),
 	AST_CLI_DEFINE(conference_viewchannel, conference_viewchannel_summary),
+#endif
 	AST_CLI_DEFINE(conference_unmute, conference_unmute_summary),
 	AST_CLI_DEFINE(conference_unmuteconference, conference_unmuteconference_summary),
 	AST_CLI_DEFINE(conference_unmutechannel, conference_unmutechannel_summary),
@@ -1699,6 +1702,7 @@ static struct ast_cli_entry app_konference_commands[] = {
 	AST_CLI_DEFINE(conference_listenvolume, conference_listenvolume_summary),
 	AST_CLI_DEFINE(conference_volume, conference_volume_summary),
 	AST_CLI_DEFINE(conference_end, conference_end_summary),
+#ifdef	VIDEO
 	AST_CLI_DEFINE(conference_lock, conference_lock_summary),
 	AST_CLI_DEFINE(conference_lockchannel, conference_lockchannel_summary),
 	AST_CLI_DEFINE(conference_unlock, conference_unlock_summary),
@@ -1708,11 +1712,16 @@ static struct ast_cli_entry app_konference_commands[] = {
 	AST_CLI_DEFINE(conference_video_unmute, conference_video_unmute_summary),
 	AST_CLI_DEFINE(conference_video_mutechannel, conference_video_mutechannel_summary),
 	AST_CLI_DEFINE(conference_video_unmutechannel, conference_video_unmutechannel_summary),
+#endif
+#ifdef	TEXT
 	AST_CLI_DEFINE(conference_text, conference_text_summary),
 	AST_CLI_DEFINE(conference_textchannel, conference_textchannel_summary),
 	AST_CLI_DEFINE(conference_textbroadcast, conference_textbroadcast_summary),
+#endif
+#ifdef	VIDEO
 	AST_CLI_DEFINE(conference_drive, conference_drive_summary),
 	AST_CLI_DEFINE(conference_drivechannel, conference_drivechannel_summary),
+#endif
 };
 #endif
 
@@ -1730,8 +1739,10 @@ void register_conference_cli( void )
 	ast_cli_register( &cli_mute );
 	ast_cli_register( &cli_muteconference );
 	ast_cli_register( &cli_mutechannel );
+#ifdef	VIDEO
 	ast_cli_register( &cli_viewstream );
 	ast_cli_register( &cli_viewchannel );
+#endif
 	ast_cli_register( &cli_unmute );
 	ast_cli_register( &cli_unmuteconference );
 	ast_cli_register( &cli_unmutechannel );
@@ -1743,6 +1754,7 @@ void register_conference_cli( void )
 	ast_cli_register( &cli_listenvolume ) ;
 	ast_cli_register( &cli_volume );
 	ast_cli_register( &cli_end );
+#ifdef	VIDEO
 	ast_cli_register( &cli_lock );
 	ast_cli_register( &cli_lockchannel );
 	ast_cli_register( &cli_unlock );
@@ -1752,14 +1764,19 @@ void register_conference_cli( void )
 	ast_cli_register( &cli_video_unmute ) ;
 	ast_cli_register( &cli_video_mutechannel ) ;
 	ast_cli_register( &cli_video_unmutechannel ) ;
+#endif
+#ifdef	TEXT
 	ast_cli_register( &cli_text );
 	ast_cli_register( &cli_textchannel );
 	ast_cli_register( &cli_textbroadcast );
+#endif
+#ifdef	VIDEO
 	ast_cli_register( &cli_drive );
 	ast_cli_register( &cli_drivechannel );
 #endif
-	ast_manager_register( "ConferenceList", 0, manager_conference_list, "Conference List" );
-	ast_manager_register( "ConferenceEnd", EVENT_FLAG_CALL, manager_conference_end, "Terminate a conference" );
+#endif
+	ast_manager_register( "KonferenceList", 0, manager_conference_list, "Conference List" );
+	ast_manager_register( "KonferenceEnd", EVENT_FLAG_CALL, manager_conference_end, "Terminate a conference" );
 
 }
 
@@ -1777,8 +1794,10 @@ void unregister_conference_cli( void )
 	ast_cli_unregister( &cli_mute );
 	ast_cli_unregister( &cli_muteconference );
 	ast_cli_unregister( &cli_mutechannel );
+#ifdef	VIDEO
 	ast_cli_unregister( &cli_viewstream );
 	ast_cli_unregister( &cli_viewchannel );
+#endif
 	ast_cli_unregister( &cli_unmute );
 	ast_cli_unregister( &cli_unmuteconference );
 	ast_cli_unregister( &cli_unmutechannel );
@@ -1790,6 +1809,7 @@ void unregister_conference_cli( void )
 	ast_cli_unregister( &cli_listenvolume ) ;
 	ast_cli_unregister( &cli_volume );
 	ast_cli_unregister( &cli_end );
+#ifdef	VIDEO
 	ast_cli_unregister( &cli_lock );
 	ast_cli_unregister( &cli_lockchannel );
 	ast_cli_unregister( &cli_unlock );
@@ -1799,12 +1819,17 @@ void unregister_conference_cli( void )
 	ast_cli_unregister( &cli_video_unmute ) ;
 	ast_cli_unregister( &cli_video_mutechannel ) ;
 	ast_cli_unregister( &cli_video_unmutechannel ) ;
+#endif
+#ifdef	TEXT
 	ast_cli_unregister( &cli_text );
 	ast_cli_unregister( &cli_textchannel );
 	ast_cli_unregister( &cli_textbroadcast );
+#endif
+#ifdef	VIDEO
 	ast_cli_unregister( &cli_drive );
 	ast_cli_unregister( &cli_drivechannel );
 #endif
-	ast_manager_unregister( "ConferenceList" );
-	ast_manager_unregister( "ConferenceEnd" );
+#endif
+	ast_manager_unregister( "KonferenceList" );
+	ast_manager_unregister( "KonferenceEnd" );
 }

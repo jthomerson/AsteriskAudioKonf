@@ -1,0 +1,51 @@
+AppKonference is a fork of AppConference. It comprises a set of enhancements
+needed to migrate a MeetMe application to AppConference.  The goals of this
+project are scalability and stability focused on voice.
+
+Here's the url to the AppKonference sourceforge site:
+	http://sourceforge.net/projects/appkonference/
+
+You can check out the code for the AppKonference project using subversion:
+	svn co https://appkonference.svn.sourceforge.net/svnroot/appkonference
+
+Here is a brief summary of the changes to AppConference:
+
+Added commands to mute/unmute a conference, increase/decrease conference
+volume, increase/decrease member volume, and start/stop moh for a member.
+
+Changed play sound command so that more than one sound can be entered on
+the command line.
+
+Added conference parameter, max_users, that limits conference members to a user
+specified maximum.
+
+Added conference variable, KONFERENCE, which is set to MAXUSERS or KICKED after
+exiting the application so that the reason for leaving a conference can be
+determined in the dial plan.
+
+Added application, KonferenceCount, was so that the member count can be used in
+the dial plan.
+
+Added new AMI event messages for mute status: ConferenceMemberMute,
+ConferenceMemberUnmute, ConferenceMute, and ConferenceUnmute.
+
+Added conference flags to ConferenceDTMF, ConferenceJoin, ConferenceState, and
+ConferenceLeave AMI event messages.
+
+Added "x" option so that when a moderator leaves callers get kicked.
+
+Added "a" option which sets vad and telephone flags on conference entry.
+
+Changed formatting of conference list command to include new listening
+state and did some rearrangement so that the channel name is displayed without
+truncation.
+
+Fixes for locking: First, fixed the conference thread so that the
+conference list lock is only locked when it's required. Second, changed the
+conference mutex to a rdlock for greater concurrency. Third, changed the way
+sounds are handled so the member lock is not held over calls to asterisk
+procedures.
+
+Fixes for compiling with asterisk 1.6 and ifdef'ing out video and/or text.
+
+Added an examples directory for a simple AMI based application and web site.

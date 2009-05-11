@@ -58,8 +58,10 @@ struct ast_frame* convert_frame_to_slinear( struct ast_trans_pvt* trans, struct 
 struct ast_frame* convert_frame_from_slinear( struct ast_trans_pvt* trans, struct ast_frame* fr ) ;
 struct ast_frame* convert_frame( struct ast_trans_pvt* trans, struct ast_frame* fr ) ;
 
+#ifdef	TEXT
 // text frame function(s)
 struct ast_frame* create_text_frame(const char *text, int copy);
+#endif
 
 // slinear frame functions
 struct ast_frame* create_slinear_frame( char* data ) ;

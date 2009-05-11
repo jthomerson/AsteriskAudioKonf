@@ -51,14 +51,18 @@ AST_MUTEX_DEFINE_STATIC(conflist_lock);
 static int conference_count = 0 ;
 
 // Forward funtcion declarations
+#ifdef	VIDEO
 static void do_VAD_switching(struct ast_conference *conf);
 static void do_video_switching(struct ast_conference *conf, int new_id, int lock);
+#endif
 static struct ast_conference* find_conf(const char* name);
 static struct ast_conference* create_conf(char* name, struct ast_conf_member* member);
 static void remove_conf(struct ast_conference* conf);
 static void add_member(struct ast_conf_member* member, struct ast_conference* conf);
 static int get_new_id(struct ast_conference *conf);
+#ifdef	VIDEO
 static int update_member_broadcasting(struct ast_conference *conf, struct ast_conf_member *member, struct conf_frame *cfr, struct timeval time);
+#endif
 
 //
 // main conference function
@@ -68,8 +72,17 @@ static void conference_exec( struct ast_conference *conf )
 {
 
 	struct ast_conf_member *next_member;
-	struct ast_conf_member *member, *video_source_member, *dtmf_source_member;;
-	struct conf_frame *cfr, *spoken_frames, *send_frames;
+	struct ast_conf_member *member;
+#if	VIDEO || DTMF
+	struct conf_frame *cfr;
+#endif
+#ifdef	VIDEO
+	struct ast_conf_member *video_source_member;
+#endif
+#ifdef	DTMF
+	struct ast_conf_member *dtmf_source_member;
+#endif
+	struct conf_frame *spoken_frames, *send_frames;
 
 	// count number of speakers, number of listeners
 	int speaker_count ;
@@ -101,12 +114,11 @@ static void conference_exec( struct ast_conference *conf )
 
 	int res;
 
+	int oldcount = 0;
+
 	//
 	// main conference thread loop
 	//
-
-
-int oldcount = 0;
 
 	while ( 42 == 42 )
 	{
@@ -159,7 +171,6 @@ int oldcount = 0;
 		// check thread frequency
 		//
 
-if (tf_count == 0) oldcount = conf->membercount ;
 
 		if ( ++tf_count >= AST_CONF_FRAMES_PER_SECOND )
 		{
@@ -179,14 +190,15 @@ if (tf_count == 0) oldcount = conf->membercount ;
 			{
 				ast_log(
 					LOG_WARNING,
-					"processed frame frequency variation, name => %s, member count => %d/%d/%d, tf_count => %d, tf_diff => %ld, tf_frequency => %2.4f\n",
-					conf->name, conf->membercount, oldcount, conf->membercount - oldcount, tf_count, tf_diff, tf_frequency
+					"processed frame frequency variation, name => %s, member count => %d/%d, tf_count => %d, tf_diff => %ld, tf_frequency => %2.4f\n",
+					conf->name, conf->membercount, oldcount, tf_count, tf_diff, tf_frequency
 				) ;
 			}
 
 			// reset values
 			tf_base = tf_curr ;
 			tf_count = 0 ;
+			oldcount = conf->membercount ;
 		}
 
 		//-----------------//
@@ -249,13 +261,14 @@ if (tf_count == 0) oldcount = conf->membercount ;
 
 		// reset pointer lists
 		spoken_frames = NULL ;
-
+#ifdef	VIDEO
 		// reset video source
 		video_source_member = NULL;
-
+#endif
+#ifdef	DTMF
                 // reset dtmf source
 		dtmf_source_member = NULL;
-
+#endif
 		// loop over member list to retrieve queued frames
 		while ( member != NULL )
 		{
@@ -303,7 +316,7 @@ if (tf_count == 0) oldcount = conf->membercount ;
 		{
 			member_process_outgoing_frames(conf, member, send_frames);
 		}
-
+#ifdef	VIDEO
 		//-------//
 		// VIDEO //
 		//-------//
@@ -430,7 +443,8 @@ if (tf_count == 0) oldcount = conf->membercount ;
 				}
 			}
 		}
-
+#endif
+#ifdef	DTMF
                 //------//
 		// DTMF //
 		//------//
@@ -458,7 +472,7 @@ if (tf_count == 0) oldcount = conf->membercount ;
 				delete_conf_frame(cfr);
 			}
 		}
-
+#endif
 		//---------//
 		// CLEANUP //
 		//---------//
@@ -483,12 +497,13 @@ if (tf_count == 0) oldcount = conf->membercount ;
 
 		if ( ( ast_tvdiff_ms(curr, notify) / AST_CONF_NOTIFICATION_SLEEP ) >= 1 )
 		{
+#ifdef	VIDEO
 			// Do VAD switching logic
 			// We need to do this here since send_state_change_notifications
 			// resets the flags
 			if ( !conf->video_locked )
 				do_VAD_switching(conf);
-
+#endif
 			// send the notifications
 			send_state_change_notifications( conf->memberlist ) ;
 
@@ -528,13 +543,6 @@ void init_conference( void )
 
 struct ast_conference* join_conference( struct ast_conf_member* member )
 {
-	// check input
-	if ( member == NULL )
-	{
-		ast_log( LOG_WARNING, "unable to handle null member\n" ) ;
-		return NULL ;
-	}
-
 	struct ast_conference* conf = NULL ;
 
 	// acquire the conference list lock
@@ -571,6 +579,8 @@ struct ast_conference* join_conference( struct ast_conf_member* member )
 			add_member( member, conf ) ;
 		} else {
 			ast_log( LOG_NOTICE, "max users exceeded: member count = %d\n", conf->membercount ) ;
+			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "MAXUSERS");
+
 			conf = NULL;
 		}
 	}
@@ -639,7 +649,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	conf->debug_flag = 0 ;
 
 	conf->id_count = 0;
-
+#ifdef	VIDEO
 	conf->default_video_source_id = -1;
 	conf->current_video_source_id = -1;
 	//conf->current_video_source_timestamp = ast_tvnow();
@@ -647,7 +657,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 
 	conf->chat_mode_on = 0;
 	conf->does_chat_mode = 0;
-
+#endif
 	// zero stats
 	memset(	&conf->stats, 0x0, sizeof( ast_conference_stats ) ) ;
 
@@ -914,6 +924,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	if (member->ismoderator)
 		conf->stats.moderators++;
 
+#ifdef	VIDEO
 	// The conference sets chat mode according to the latest member chat flag
 	conf->does_chat_mode = member->does_chat_mode;
 
@@ -926,7 +937,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 
 	if ( member->mute_video )
 		stop_video(member);
-
+#endif
 	// set a long term id
 	int new_initial_id = 0;
 	othermember = conf->memberlist;
@@ -1009,6 +1020,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 
 	while ( member_list != NULL )
 	{
+#ifdef	VIDEO
 		// If member is driven by the currently visited member, break the association
 		if ( member_list->driven_member == member )
 		{
@@ -1020,7 +1032,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 			// Release member mutex
 			ast_mutex_unlock(&member_list->lock);
 		}
-
+#endif
 		if ( member_list == member )
 		{
 
@@ -1060,7 +1072,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 
 			if (member->ismoderator)
 				conf->stats.moderators--;
-
+#ifdef	VIDEO
 			// Check if member is the default or current video source
 			if ( conf->current_video_source_id == member->id )
 			{
@@ -1085,12 +1097,13 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 					member->channel_name
 					);
 			}
-			
+#endif
 			// output to manager...
 			manager_event(
 				EVENT_FLAG_CALL,
 				"ConferenceLeave",
 				"ConferenceName: %s\r\n"
+				"UniqueID: %s\r\n"
 				"Member: %d\r\n"
 				"Flags: %s\r\n"
 				"Channel: %s\r\n"
@@ -1100,6 +1113,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 				"Moderators: %d\r\n"
 				"Count: %d\r\n",
 				conf->name,
+				member->uniqueid,
 				member->id,
 				member->flags,
 				member->channel_name,
@@ -1256,14 +1270,17 @@ int show_conference_list ( int fd, const char *name )
 			ast_rwlock_rdlock(&conf->lock);
 
 			// ast_cli(fd, "Chat mode is %s\n", conf->chat_mode_on ? "ON" : "OFF");
-
+#ifdef	VIDEO
 			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Channel");
-
+#else
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Channel");
+#endif
 			// do the biz
 			member = conf->memberlist ;
 			while ( member != NULL )
 			{
 				snprintf(volume_str, 10, "%d:%d", member->talk_volume, member->listen_volume);
+#ifdef	VIDEO
 				if ( member->driven_member == NULL )
 				{
 					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-80s\n",
@@ -1272,6 +1289,10 @@ int show_conference_list ( int fd, const char *name )
 					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d %-20.20s\n", member->id, member->flags,
 					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->channel_name);
 				}
+#else
+				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-80s\n",
+				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->channel_name);
+#endif
 				member = member->next;
 			}
 
@@ -1329,9 +1350,11 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 						"CallerID: %s\r\n"
 						"CallerIDName: %s\r\n"
 						"Muted: %s\r\n"
+#ifdef	VIDEO
 						"VideoMuted: %s\r\n"
 						"Default: %s\r\n"
 						"Current: %s\r\n"
+#endif
 						"%s"
 						"\r\n",
 						conf->name,
@@ -1340,9 +1363,11 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 						member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
 						member->chan->cid.cid_name ? member->chan->cid.cid_name : "unknown",
 						member->mute_audio ? "YES" : "NO",
+#ifdef	VIDEO
 						member->mute_video ? "YES" : "NO",
 						member->id == conf->default_video_source_id ? "YES" : "NO",
 						member->id == conf->current_video_source_id ? "YES" : "NO",
+#endif
 						idText);
 			    member = member->next;
 			  }
@@ -1758,7 +1783,7 @@ int unmute_conference (  const char* confname)
 
 	return res ;
 }
-
+#ifdef	VIDEO
 int viewstream_switch ( const char* confname, int user_id, int stream_id )
 {
   struct ast_conf_member *member;
@@ -1880,7 +1905,7 @@ int viewchannel_switch ( const char* confname, const char* userchan, const char*
 
 	return res ;
 }
-
+#endif
 int get_conference_stats( ast_conference_stats* stats, int requested )
 {
 	// no conferences exist
@@ -1994,7 +2019,7 @@ struct ast_conf_member *find_member (const char *chan, int lock)
 
 	return found;
 }
-
+#ifdef	VIDEO
 // All the VAD-based video switching magic happens here
 // This function should be called inside conference_exec
 // The conference mutex should be locked, we don't have to do it here
@@ -2565,7 +2590,8 @@ int video_unmute_channel(const char *conference, const char *channel)
 
 	return res;
 }
-
+#endif
+#ifdef	TEXT
 //
 // Text message functions
 //
@@ -2711,7 +2737,8 @@ int send_text_message_to_member(struct ast_conf_member *member, const char *text
 
 	return 0;
 }
-
+#endif
+#ifdef	VIDEO
 // Associates two members
 // Drives VAD-based video switching of dst_member from audio from src_member
 // This can be used when a member participates in a video conference but
@@ -2917,7 +2944,7 @@ static void do_video_switching(struct ast_conference *conf, int new_id, int lock
 	if ( lock )
 		ast_rwlock_unlock( &conf->lock );
 }
-
+#endif
 int play_sound_channel(int fd, const char *channel, char **file, int mute, int n)
 {
 	struct ast_conf_member *member;
@@ -2974,10 +3001,6 @@ int stop_sound_channel(int fd, const char *channel)
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (member->moh_flag)
-	{
-		ast_mutex_unlock(&member->lock);
-		return 1 ;
 	}
 
 	// clear all sounds
@@ -2997,8 +3020,6 @@ int stop_sound_channel(int fd, const char *channel)
 int start_moh_channel(int fd, const char *channel)
 {
 	struct ast_conf_member *member;
-	struct ast_conf_soundq *sound;
-	struct ast_conf_soundq *next;
 
 	ast_cli( fd, "Starting moh to member %s\n", channel);
 
@@ -3013,20 +3034,13 @@ int start_moh_channel(int fd, const char *channel)
 		return 1 ;
 	}
 
-	// clear all sounds
-	sound = member->soundq;
-
-	while ( sound )
-	{
-		next = sound->next;
-		sound->stopped = 1;
-		sound = next;
+	if (!member->soundq) {
+		member->moh_flag = member->muted = 1;
+		member->ready_for_outgoing = 0;
+		ast_moh_start(member->chan, NULL, NULL);
+	} else {
+		member->moh_flag = 1;
 	}
-
-	member->moh_flag = member->muted = 1;
-	member->ready_for_outgoing = 0;
-
-	ast_moh_start(member->chan, NULL, NULL);
 
 	ast_mutex_unlock(&member->lock);
 
@@ -3129,7 +3143,7 @@ int volume(int fd, const char *conference, int up)
 
 	return 1;
 }
-
+#ifdef	VIDEO
 static int update_member_broadcasting(struct ast_conference *conf, struct ast_conf_member *member, struct conf_frame *cfr, struct timeval now)
 {
 	if ( conf == NULL || member == NULL )
@@ -3164,7 +3178,7 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 
 	return member->video_broadcast_active;
 }
-
+#endif
 int count_exec( struct ast_channel* chan, void* data )
 {
 	int res = 0;

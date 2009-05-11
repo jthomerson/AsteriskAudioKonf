@@ -142,14 +142,18 @@
 // maximum number of frames queued per member
 #define AST_CONF_MAX_QUEUE 100
 
+#ifdef	VIDEO
 // max video frames in the queue
 #define AST_CONF_MAX_VIDEO_QUEUE 800
+#endif
 
 // max dtmf frames in the queue
 #define AST_CONF_MAX_DTMF_QUEUE 8
 
+#ifdef	TEXT
 // max text frames in the queue
 #define AST_CONF_MAX_TEXT_QUEUE 8
+#endif
 
 // minimum number of frames queued per member
 #define AST_CONF_MIN_QUEUE 0
@@ -221,6 +225,7 @@
 //
 #define AST_CONF_MAX_USERS 0
 
+#ifdef	VIDEO
 //
 // Default VAD based video switching parameters
 // All time related values are in ms
@@ -236,6 +241,7 @@
 // the member has stopped broadcasting video
 #define AST_CONF_VIDEO_STOP_BROADCAST_TIMEOUT 200
 
+#ifdef	TEXT
 //
 // Text frame control protocol
 //
@@ -245,6 +251,9 @@
 #define AST_CONF_CONTROL_STOP_VIDEO           "CONTROL:STOPVIDEO"
 #define AST_CONF_CONTROL_STOP_VIDEO_TRANSMIT  "CONTROL:STOP_VIDEO_TRANSMIT"
 #define AST_CONF_CONTROL_START_VIDEO_TRANSMIT "CONTROL:START_VIDEO_TRANSMIT"
+#endif
+
+#endif
 
 // utility functions
 void add_milliseconds( struct timeval* tv, long ms ) ;

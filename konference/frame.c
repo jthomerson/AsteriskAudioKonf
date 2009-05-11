@@ -529,6 +529,7 @@ conf_frame* copy_conf_frame( conf_frame* src )
 	return cfr ;
 }
 
+#ifdef	TEXT
 //
 // Create a TEXT frame based on a given string
 //
@@ -568,6 +569,7 @@ struct ast_frame* create_text_frame(const char *text, int copy)
 
 	return f;
 }
+#endif
 
 //
 // slinear frame functions
