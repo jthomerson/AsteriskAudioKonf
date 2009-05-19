@@ -77,9 +77,10 @@ struct ast_conf_member
 
 	// video conference params
 	int id;
+#ifdef	VIDEO
 	int initial_id;
 	int req_id;
-
+#endif
 	// muting options - this member will not be heard/seen
 	int mute_audio;
 	int muted; // should incoming audio be muted while we play?
@@ -171,9 +172,9 @@ struct ast_conf_member
 	conf_frame* outTextFramesTail ;
 	unsigned int outTextFramesCount ;
 #endif
+#ifdef	VIDEO
 	// LL video switched flag
 	short conference;
-#ifdef	VIDEO
 	// switch video by VAD?
 	short vad_switch;
 	// do a VAD switch even if video is not enabled?

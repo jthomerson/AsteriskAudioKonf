@@ -86,23 +86,34 @@ Please look at CLI.txt for a comprehensive list of CLI commands and parameters.
 
 Manager Events
 
-<This section is outdated>
 app_konference generates several detailed manager events so that applications
 interfacing with the manager API can monitor conferences:
 
-    * ConferenceState:  sent as members begin/end speaking.
-	Channel: The channel
-	State: "speaking" or "silent"
+	* ConferenceJoin: join conference
+	* ConferenceLeave: leave conference
 
-    * ConferenceDTMF: sent when conference members send DTMF to the conference
-	Channel: The channel
-	Key: The DTMF key send [0-9*#]
+	* ConferenceDTMF: dtmf received
+	* ConferenceState: speaking state changed
+	* ConferenceSoundComplete: sound completed
 
-    * ConferenceSoundComplete: send when the conference has finished playing 
-		a sound to a user	
-	Channel: The channel
-	Sound: The first 255 bytes of the file requested in conference play 
-		sound CLI/Mgr command.	
+	* ConferenceMemberMute: mute member
+	* ConferenceMute: mute conference
+	* ConferenceMemberUnmute: unmute member
+	* ConferenceUnmute: unmute conference
+
+	* ConferenceCameraDisabled: camera disabled
+	* ConferenceCameraEnabled: camera enabled
+	* ConferenceStopVideoTransmit: stop video
+	* ConferenceStartVideoTransmit: start video
+	* ConferenceUnlock: unlock conference video
+	* ConferenceLock: lock conference video
+	* ConferenceVideoBroadcastOff: video broadcast off
+	* ConferenceVideoBroadcastOn: video broadcast on
+	* ConferenceVideoMute: mute video
+	* ConferenceVideoUnmute: unmute video
+	* ConferenceDefault: set video default
+	* ConferenceVideoSwitch: video switched
+
 
 
 Benchmarking

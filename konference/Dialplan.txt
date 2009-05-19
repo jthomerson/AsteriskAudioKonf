@@ -10,9 +10,8 @@ The optional arguments have the format <arg>=<value> and should be separated by 
 1. Flags
 
 Mute/no receive options:
-// not using C/c options
-// 'C' : member starts with video muted
-// 'c' : member starts unable to receive video
+'C' : member starts with video muted
+'c' : member starts unable to receive video
 'L' : member starts with audio muted
 'l' : member starts unable to receive audio
 
@@ -46,7 +45,7 @@ Future development (these are not implemented yet):
 2. Arguments
 
 The parser is not perfect so it might not cope well with spurious spaces or other characters.
-All arguments are optional; appconference will use sane default values for missing arguments.
+All arguments are optional; appkonference will use sane default values for missing arguments.
 
 priority=<int> : This argument is currently unused, it was intended to allow for prioritization of speakers.  It might be reinstated in a future appconference revision
 vad_prob_start=<float> : Probability used to detect start of speech

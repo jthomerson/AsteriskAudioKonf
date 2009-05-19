@@ -46,17 +46,17 @@ A member in a conference can be referred to by its id or by its channel.  Id is 
   usage: conference volume <conference name> (up|down)
 
 - konference play sound: play a sound to a conference member
-  usage: conference play sound <channel-id> (<sound-file>)+ [mute]
+  usage: conference play sound <channel> (<sound-file>)+ [mute]
   If mute is specified, all other audio is muted while the sound is played back.
 
 - konference stop sound: stop playing sounds to a conference member
-  usage: conference stop sound <channel-id>
+  usage: conference stop sound <channel>
 
 - konference start moh: start music on hold for a conference member
-  usage: conference start moh <channel-id>
+  usage: conference start moh <channel>
 
 - konference stop moh: stop music on hold for a conference member
-  usage: conference start moh <channel-id>
+  usage: conference start moh <channel>
 
 - konference restart: kick all users in all conferences
   usage: conference restart

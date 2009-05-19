@@ -889,8 +889,10 @@ int end_conference(const char *name, int hangup )
 // This function should be called with conflist_lock held
 static void add_member( struct ast_conf_member *member, struct ast_conference *conf )
 {
-        int newid, last_id;
+        int newid;
+#ifdef	VIDEO
         struct ast_conf_member *othermember;
+#endif
 
 	if ( conf == NULL )
 	{
@@ -906,8 +908,9 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 		// get an ID for this member
 		newid = get_new_id( conf );
 		member->id = newid;
-	} else
-	{
+	}
+#ifdef	VIDEO
+	else {
 		// boot anyone who has this id already
 		othermember = conf->memberlist;
 		while (othermember)
@@ -917,7 +920,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 			othermember = othermember->next;
 		}
 	}
-
+#endif
 	// update conference stats
 	conf->membercount++;
 
@@ -937,7 +940,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 
 	if ( member->mute_video )
 		stop_video(member);
-#endif
+
 	// set a long term id
 	int new_initial_id = 0;
 	othermember = conf->memberlist;
@@ -953,6 +956,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 
 	ast_log( AST_CONF_DEBUG, "new video id %d\n", newid) ;
 
+	int last_id;
 	if (conf->memberlist) last_id = conf->memberlist->id;
 	else last_id = 0;
 
@@ -962,7 +966,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 		if (member->id > 0) member->req_id = 0;
 		else member->req_id = 1;
 	}
-
+#endif
 	member->next = conf->memberlist ; // next is now list
 	conf->memberlist = member ; // member is now at head of list
 
@@ -1001,7 +1005,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 	struct ast_conf_member *member_temp = NULL ;
 
 	int count = -1 ; // default return code
-
+#ifdef	VIDEO
 	while ( member_list != NULL )
 	{
 		// set conference to send no_video to anyone who was watching us
@@ -1015,7 +1019,7 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 	}
 
 	member_list = conf->memberlist ;
-
+#endif
 	int member_is_moderator = ( member->ismoderator && member->kick_conferees ? 1 : 0 );
 
 	while ( member_list != NULL )

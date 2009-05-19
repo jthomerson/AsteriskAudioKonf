@@ -500,6 +500,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
+			if ( member->chan->_softhangup )
+				return 1;
+
 			// log 'dropped' outgoing frame
 			ast_log( LOG_ERROR, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -538,6 +541,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
+			if ( member->chan->_softhangup )
+				return 1;
+
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write video frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -570,6 +576,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
+			if ( member->chan->_softhangup )
+				return 1;
+
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write dtmf frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -601,6 +610,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
+			if ( member->chan->_softhangup )
+				return 1;
+
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write text frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -827,10 +839,12 @@ int member_exec( struct ast_channel* chan, void* data )
 		// update the current timestamps
 		curr = ast_tvnow();
 
-		process_outgoing(member);
-		// back to process incoming frames
-
-		continue ;
+		if ( !process_outgoing(member) )
+			// back to process incoming frames
+			continue ;
+		else
+			// they probably hungup...
+			break ;
 	}
 
 	ast_log( AST_CONF_DEBUG, "end member event loop, time_entered => %ld\n", member->time_entered.tv_sec ) ;
@@ -1071,14 +1085,16 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->inTextFramesTail = NULL ;
 	member->inTextFramesCount = 0 ;
 #endif
-	member->conference = 1; // we have switched req_id
 #ifdef	VIDEO
+	member->conference = 1; // we have switched req_id
 	member->dtmf_switch = 0; // no dtmf switch by default
 #endif
 	member->dtmf_relay = 0; // no dtmf relay by default
 
 	// start of day video ids
+#ifdef	VIDEO
 	member->req_id = -1;
+#endif
 	member->id = -1;
 
 	member->first_frame_received = 0; // cause a FIR after NAT delay
@@ -1186,7 +1202,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	for ( i = 0 ; i < strlen( flags ) ; ++i )
 	{
-
+#ifdef	VIDEO
 		if (flags[i] >= (int)'0' && flags[i] <= (int)'9')
 		{
 			if (member->req_id < 0)
@@ -1202,6 +1218,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			}
 		}
 		else
+#endif
 		{
 			// allowed flags are C, c, L, l, V, D, A, C, X, R, T, t, M, S, z, o, F
 			// mute/no_recv options

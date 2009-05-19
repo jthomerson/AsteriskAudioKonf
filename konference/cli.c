@@ -711,8 +711,8 @@ char *conference_unmutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_
 // play sound
 //
 static char conference_play_sound_usage[] =
-	"Usage: konference play sound <channel-id> (<sound-file>)+ [mute]\n"
-	"       Play sound(s) (<sound-file>)+ to conference member <channel-id>\n"
+	"Usage: konference play sound <channel> (<sound-file>)+ [mute]\n"
+	"       Play sound(s) (<sound-file>)+ to conference member <channel>\n"
 	"       If mute is specified, all other audio is muted while the sound is played back\n"
 ;
 
@@ -755,8 +755,8 @@ char *conference_play_sound(struct ast_cli_entry *e, int cmd, struct ast_cli_arg
 // stop sounds
 //
 static char conference_stop_sounds_usage[] =
-	"Usage: konference stop sounds <channel-id>\n"
-	"       Stop sounds for conference member <channel-id>\n"
+	"Usage: konference stop sounds <channel>\n"
+	"       Stop sounds for conference member <channel>\n"
 ;
 
 #define CONFERENCE_STOP_SOUNDS_CHOICES { "konference", "stop", "sounds", NULL }
@@ -795,8 +795,8 @@ char *conference_stop_sounds(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 // start moh
 //
 static char conference_start_moh_usage[] =
-	"Usage: konference start moh <channel-id>\n"
-	"       Start moh for conference member <channel-id>\n"
+	"Usage: konference start moh <channel>\n"
+	"       Start moh for conference member <channel>\n"
 ;
 
 #define CONFERENCE_START_MOH_CHOICES { "konference", "start", "moh", NULL }
@@ -835,8 +835,8 @@ char *conference_start_moh(struct ast_cli_entry *e, int cmd, struct ast_cli_args
 // stop moh
 //
 static char conference_stop_moh_usage[] =
-	"Usage: konference stop moh <channel-id>\n"
-	"       Stop moh for conference member <channel-id>\n"
+	"Usage: konference stop moh <channel>\n"
+	"       Stop moh for conference member <channel>\n"
 ;
 
 #define CONFERENCE_STOP_MOH_CHOICES { "konference", "stop", "moh", NULL }
@@ -876,8 +876,8 @@ char *conference_stop_moh(struct ast_cli_entry *e, int cmd, struct ast_cli_args 
 // adjust talk volume
 //
 static char conference_talkvolume_usage[] =
-	"Usage: konference talkvolume <channel-id> ( up | down )\n"
-	"       Adjust talk volume for conference member <channel-id>\n"
+	"Usage: konference talkvolume <channel> ( up | down )\n"
+	"       Adjust talk volume for conference member <channel>\n"
 ;
 
 #define CONFERENCE_TALKVOLUME_CHOICES { "konference", "talkvolume", NULL }
@@ -924,8 +924,8 @@ char *conference_talkvolume(struct ast_cli_entry *e, int cmd, struct ast_cli_arg
 // adjust listen volume
 //
 static char conference_listenvolume_usage[] =
-	"Usage: konference listenvolume <channel-id> ( up | down )\n"
-	"       Adjust listen volume for conference member <channel-id>\n"
+	"Usage: konference listenvolume <channel> ( up | down )\n"
+	"       Adjust listen volume for conference member <channel>\n"
 ;
 
 #define CONFERENCE_LISTENVOLUME_CHOICES { "konference", "listenvolume", NULL }

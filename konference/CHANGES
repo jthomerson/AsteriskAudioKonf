@@ -19,7 +19,7 @@ the command line.
 Added conference parameter, max_users, that limits conference members to a user
 specified maximum.
 
-Added conference variable, KONFERENCE, which is set to MAXUSERS or KICKED after
+Added channel variable, KONFERENCE, which is set to MAXUSERS or KICKED after
 exiting the application so that the reason for leaving a conference can be
 determined in the dial plan.
 
@@ -46,6 +46,9 @@ conference mutex to a rdlock for greater concurrency. Third, changed the way
 sounds are handled so the member lock is not held over calls to asterisk
 procedures.
 
-Fixes for compiling with asterisk 1.6 and ifdef'ing out video and/or text.
+Fixes for compiling with asterisk 1.6 and ifdef'ing out video and/or text
+and/or dtmf. The default is voice only. To compile with video, text, and dtmf
+change the defaults in the Makefile or specify them on the command line: make
+VIDEO=1 TEXT=1 DTMF=1. 
 
 Added an examples directory for a simple AMI based application and web site.
