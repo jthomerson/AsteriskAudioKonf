@@ -138,7 +138,7 @@ void add_milliseconds(struct timeval* tv, long ms)
 	tv->tv_sec += s ;
 }
 
-#define AST_MODULE "Conference"
+#define AST_MODULE "Konference"
 AST_MODULE_INFO_STANDARD(ASTERISK_GPL_KEY,
 		"Channel Independent Conference Application");
 #undef AST_MODULE

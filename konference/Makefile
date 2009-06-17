@@ -25,7 +25,10 @@ ASTERISK_INCLUDE_DIR ?= ../asterisk/include
 REVISION = $(shell svnversion -n .)
 
 # turn app_konference debugging on or off ( 0 == OFF, 1 == ON )
-APP_CONFERENCE_DEBUG ?= 0
+APP_KONFERENCE_DEBUG ?= 0
+
+# channel table size default
+CHANNEL_TABLE_SIZE ?= 997
 
 # turn app_konference texting on of off ( 0 == OFF, 1 == ON )
 TEXT ?= 0
@@ -72,6 +75,7 @@ CPPFLAGS = $(INCLUDE) -D_REENTRANT -D_GNU_SOURCE -DREVISION=\"$(REVISION)\"
 CFLAGS += $(shell if uname -m | grep -q ppc; then echo "-fsigned-char"; fi)
 CFLAGS += -fPIC
 CPPFLAGS += -DCRYPTO
+CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
 
 #
 # Uncomment this if you want G.729A support (need to have the actual codec installed
@@ -79,8 +83,8 @@ CPPFLAGS += -DCRYPTO
 # CPPFLAGS += -DAC_USE_G729A
 
 
-ifeq ($(APP_CONFERENCE_DEBUG), 1)
-CPPFLAGS += -DAPP_CONFERENCE_DEBUG
+ifeq ($(APP_KONFERENCE_DEBUG), 1)
+CPPFLAGS += -DAPP_KONFERENCE_DEBUG
 endif
 
 ifeq ($(TEXT), 1)

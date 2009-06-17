@@ -59,8 +59,8 @@ static struct ast_conference* find_conf(const char* name);
 static struct ast_conference* create_conf(char* name, struct ast_conf_member* member);
 static void remove_conf(struct ast_conference* conf);
 static void add_member(struct ast_conf_member* member, struct ast_conference* conf);
-static int get_new_id(struct ast_conference *conf);
 #ifdef	VIDEO
+static int get_new_id(struct ast_conference *conf);
 static int update_member_broadcasting(struct ast_conference *conf, struct ast_conf_member *member, struct conf_frame *cfr, struct timeval time);
 #endif
 
@@ -71,7 +71,6 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 static void conference_exec( struct ast_conference *conf )
 {
 
-	struct ast_conf_member *next_member;
 	struct ast_conf_member *member;
 #if	VIDEO || DTMF
 	struct conf_frame *cfr;
@@ -218,10 +217,13 @@ static void conference_exec( struct ast_conference *conf )
 
 		if ( conf->membercount == 0 )
 		{
-			if ((res = ast_mutex_trylock(&conflist_lock)) != 0)
+			if ( ((res = ast_mutex_trylock(&conflist_lock)) != 0) || (conf->membercount != 0) )
 			{
+				if ( !res )
+					ast_mutex_unlock(&conflist_lock);
+
 				ast_rwlock_unlock(&conf->lock);
-				ast_log ( LOG_NOTICE, "conference conflist trylock failed, res => %d,  name => %s\n", res, conf->name) ;
+				ast_log ( LOG_NOTICE, "conference conflist trylock failed, res => %d,  name => %s, member count => %d\n", res, conf->name, conf->membercount ) ;
 				continue;
 			}
 			if (conf->debug_flag)
@@ -272,15 +274,10 @@ static void conference_exec( struct ast_conference *conf )
 		// loop over member list to retrieve queued frames
 		while ( member != NULL )
 		{
-			// take note of next member - before it's too late
-			next_member = member->next;
-
-			// this MIGHT delete member
 			member_process_spoken_frames(conf,member,&spoken_frames,time_diff,
 						     &listener_count, &speaker_count);
 
-			// adjust our pointer to the next inline
-			member = next_member;
+			member = member->next;
 		}
 
 		// ast_log( AST_CONF_DEBUG, "finished processing incoming audio, name => %s\n", conf->name ) ;
@@ -539,6 +536,11 @@ static void conference_exec( struct ast_conference *conf )
 void init_conference( void )
 {
 	ast_mutex_init( &conflist_lock ) ;
+	channel_table = malloc (CHANNEL_TABLE_SIZE * sizeof (struct channel_bucket) ) ;
+	int i;
+	for ( i = 0; i < CHANNEL_TABLE_SIZE; i++)
+		AST_LIST_HEAD_INIT (&channel_table[i]) ;
+	ast_log( LOG_NOTICE, "initializing channel table, size = %d\n", CHANNEL_TABLE_SIZE ) ;
 }
 
 struct ast_conference* join_conference( struct ast_conf_member* member )
@@ -642,11 +644,15 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 
 	conf->next = NULL ;
 	conf->memberlist = NULL ;
-
+#ifndef	VIDEO
+	conf->memberlast = NULL ;
+#endif
 	conf->membercount = 0 ;
 	conf->conference_thread = -1 ;
 
 	conf->debug_flag = 0 ;
+
+	conf->kick_flag = 0 ;
 
 	conf->id_count = 0;
 #ifdef	VIDEO
@@ -684,28 +690,23 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	conf->from_slinear_paths[ AC_G729A_INDEX ] = ast_translator_build_path( AST_FORMAT_G729A, AST_FORMAT_SLINEAR ) ;
 #endif
 
-	// add the initial member
-	add_member( member, conf ) ;
-
 	ast_log( AST_CONF_DEBUG, "added new conference to conflist, name => %s\n", name ) ;
 
 	//
 	// spawn thread for new conference, using conference_exec( conf )
 	//
-	// acquire conference lock
-	ast_rwlock_wrlock( &conf->lock ) ;
 
 	if ( ast_pthread_create( &conf->conference_thread, NULL, (void*)conference_exec, conf ) == 0 )
 	{
 		// detach the thread so it doesn't leak
 		pthread_detach( conf->conference_thread ) ;
 
+		// add the initial member
+		add_member( member, conf ) ;
+
 		// prepend new conference to conflist
 		conf->next = conflist ;
 		conflist = conf ;
-
-		// release conference lock
-		ast_rwlock_unlock( &conf->lock ) ;
 
 		ast_log( AST_CONF_DEBUG, "started conference thread for conference, name => %s\n", conf->name ) ;
 	}
@@ -714,9 +715,6 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 		ast_log( LOG_ERROR, "unable to start conference thread for conference %s\n", conf->name ) ;
 
 		conf->conference_thread = -1 ;
-
-		// release conference lock
-		ast_rwlock_unlock( &conf->lock ) ;
 
 		// clean up conference
 		free( conf ) ;
@@ -808,6 +806,7 @@ static void remove_conf( struct ast_conference *conf )
 	return ;
 }
 
+#ifdef	VIDEO
 static int get_new_id( struct ast_conference *conf )
 {
 	// must have the conf lock when calling this
@@ -830,7 +829,7 @@ static int get_new_id( struct ast_conference *conf )
 	}
 	return newid;
 }
-
+#endif
 
 int end_conference(const char *name, int hangup )
 {
@@ -889,8 +888,8 @@ int end_conference(const char *name, int hangup )
 // This function should be called with conflist_lock held
 static void add_member( struct ast_conf_member *member, struct ast_conference *conf )
 {
-        int newid;
 #ifdef	VIDEO
+        int newid;
         struct ast_conf_member *othermember;
 #endif
 
@@ -903,13 +902,13 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	// acquire the conference lock
 	ast_rwlock_wrlock( &conf->lock ) ;
 
+#ifdef	VIDEO
 	if (member->id < 0)
 	{
 		// get an ID for this member
 		newid = get_new_id( conf );
 		member->id = newid;
 	}
-#ifdef	VIDEO
 	else {
 		// boot anyone who has this id already
 		othermember = conf->memberlist;
@@ -966,9 +965,30 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 		if (member->id > 0) member->req_id = 0;
 		else member->req_id = 1;
 	}
-#endif
+
 	member->next = conf->memberlist ; // next is now list
 	conf->memberlist = member ; // member is now at head of list
+
+#else
+	member->id = ( !conf->memberlast ? 1 : conf->memberlast->id + 1 ) ;
+
+	if ( !conf->memberlist )
+		conf->memberlist = conf->memberlast = member ;
+	else {
+		member->prev = conf->memberlast ; // dbl links
+		conf->memberlast->next = member ;
+		conf->memberlast = member ;
+	}
+#endif
+
+	// add member to channel table
+	member->bucket = &(channel_table[hash(member->chan->name) % CHANNEL_TABLE_SIZE]);
+
+	AST_LIST_LOCK (member->bucket ) ;
+	AST_LIST_INSERT_HEAD (member->bucket, member, hash_entry) ;
+	AST_LIST_UNLOCK (member->bucket ) ;
+
+	//ast_log( AST_CONF_DEBUG, "Added %s to the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
 
 	ast_log( AST_CONF_DEBUG, "member added to conference, name => %s\n", conf->name ) ;
 
@@ -978,20 +998,20 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	return ;
 }
 
-int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
+void remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 {
 	// check for member
 	if ( member == NULL )
 	{
 		ast_log( LOG_WARNING, "unable to remove NULL member\n" ) ;
-		return -1 ;
+		return ;
 	}
 
 	// check for conference
 	if ( conf == NULL )
 	{
 		ast_log( LOG_WARNING, "unable to remove member from NULL conference\n" ) ;
-		return -1 ;
+		return  ;
 	}
 
 	//
@@ -1001,10 +1021,14 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 
 	ast_rwlock_wrlock( &conf->lock );
 
+#ifdef	VIDEO
 	struct ast_conf_member *member_list = conf->memberlist ;
 	struct ast_conf_member *member_temp = NULL ;
+#else
+	struct ast_conf_member *member_list = member ;
+	struct ast_conf_member *member_temp = member->prev ;
+#endif
 
-	int count = -1 ; // default return code
 #ifdef	VIDEO
 	while ( member_list != NULL )
 	{
@@ -1020,11 +1044,11 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 
 	member_list = conf->memberlist ;
 #endif
-	int member_is_moderator = ( member->ismoderator && member->kick_conferees ? 1 : 0 );
+	conf->kick_flag = ( member->ismoderator && member->kick_conferees ? 1 : 0 );
 
+#ifdef	VIDEO
 	while ( member_list != NULL )
 	{
-#ifdef	VIDEO
 		// If member is driven by the currently visited member, break the association
 		if ( member_list->driven_member == member )
 		{
@@ -1036,10 +1060,9 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 			// Release member mutex
 			ast_mutex_unlock(&member_list->lock);
 		}
-#endif
 		if ( member_list == member )
 		{
-
+#endif
 			//
 			// log some accounting information
 			//
@@ -1070,9 +1093,14 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 				conf->memberlist = member->next ;
 			else
 				member_temp->next = member->next ;
+#ifndef	VIDEO
+			if(member->next) member->next->prev =  member_temp ; // dbl links
 
+			if ( conf->memberlast == member )
+				conf->memberlast = ( member_temp == NULL ? NULL : member_temp );
+#endif
 			// update conference stats
-			count = --conf->membercount;
+			--conf->membercount;
 
 			if (member->ismoderator)
 				conf->stats.moderators--;
@@ -1125,12 +1153,19 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 				member->callername,
 				tt,
 				conf->stats.moderators,
-				count
+				conf->membercount
 			) ;
 
 			// save a pointer to the current member,
 			// and then point to the next member in the list
 			member_list = member_list->next ;
+
+			// remove member from channel table
+			AST_LIST_LOCK (member->bucket ) ;
+			AST_LIST_REMOVE (member->bucket, member, hash_entry) ;
+			AST_LIST_UNLOCK (member->bucket ) ;
+
+			//ast_log( AST_CONF_DEBUG, "Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
 
 			// leave member_temp alone.
 			// it already points to the previous (or NULL).
@@ -1141,30 +1176,20 @@ int remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 
 			ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
 					conf->name, conf->membercount ) ;
-
+#ifdef	VIDEO
 			//break ;
 		}
 		else
 		{
-			// if member is a moderator, we end the conference when they leave
-			if ( member_is_moderator )
-			{
-				ast_mutex_lock( &member_list->lock ) ;
-				member_list->kick_flag = 1;
-				ast_mutex_unlock( &member_list->lock ) ;
-			}
-
 			// save a pointer to the current member,
 			// and then point to the next member in the list
 			member_temp = member_list ;
 			member_list = member_list->next ;
 		}
 	}
+#endif
 	ast_rwlock_unlock( &conf->lock );
 
-	// return -1 on error, or the number of members
-	// remaining if the requested member was deleted
-	return count ;
 }
 
 //
@@ -1275,9 +1300,9 @@ int show_conference_list ( int fd, const char *name )
 
 			// ast_cli(fd, "Chat mode is %s\n", conf->chat_mode_on ? "ON" : "OFF");
 #ifdef	VIDEO
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Bucket", "Channel");
 #else
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "Flags", "Audio", "Volume", "Bucket", "Channel");
 #endif
 			// do the biz
 			member = conf->memberlist ;
@@ -1287,15 +1312,15 @@ int show_conference_list ( int fd, const char *name )
 #ifdef	VIDEO
 				if ( member->driven_member == NULL )
 				{
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-80s\n",
-					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*",  member->channel_name);
+					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20ld %-80s\n",
+					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", member->bucket - channel_table, member->channel_name);
 				} else {
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d %-20.20s\n", member->id, member->flags,
-					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->channel_name);
+					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d  %-20ld %-20.20s\n", member->id, member->flags,
+					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->bucket - channel_table, member->channel_name);
 				}
 #else
-				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-80s\n",
-				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->channel_name);
+				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20ld %-80s\n",
+				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->bucket - channel_table, member->channel_name);
 #endif
 				member = member->next;
 			}
@@ -1457,60 +1482,6 @@ int kick_member (  const char* confname, int user_id)
 			      }
 			    member = member->next;
 			  }
-			ast_rwlock_unlock( &conf->lock ) ;
-			break ;
-		}
-
-		conf = conf->next ;
-	}
-
-	// release mutex
-	ast_mutex_unlock( &conflist_lock ) ;
-
-	return res ;
-}
-
-int kick_channel ( const char *confname, const char *channel)
-{
-	struct ast_conf_member *member;
-	int res = 0;
-
-	// no conferences exist
-	if ( conflist == NULL )
-	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
-		return 0 ;
-	}
-
-	if ( confname == NULL || channel == NULL || strlen(confname) == 0 || strlen(channel) == 0 )
-		return 0;
-
-	// acquire mutex
-	ast_mutex_lock( &conflist_lock ) ;
-
-	struct ast_conference *conf = conflist ;
-
-	// loop through conf list
-	while ( conf != NULL )
-	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
-		{
-			// do the biz
-			ast_rwlock_rdlock( &conf->lock ) ;
-			member = conf->memberlist ;
-			while ( member != NULL )
-			{
-				if ( strncasecmp( member->channel_name, channel, 80 ) == 0 )
-				{
-					ast_mutex_lock( &member->lock ) ;
-					member->kick_flag = 1;
-					//ast_soft_hangup(member->chan);
-					ast_mutex_unlock( &member->lock ) ;
-
-					res = 1;
-				}
-				member = member->next;
-			}
 			ast_rwlock_unlock( &conf->lock ) ;
 			break ;
 		}
@@ -1983,46 +1954,29 @@ int get_conference_stats_by_name( ast_conference_stats* stats, const char* name 
 	return ( stats == NULL ) ? 0 : 1 ;
 }
 
-struct ast_conf_member *find_member (const char *chan, int lock)
+struct ast_conf_member *find_member( const char *chan )
 {
-	struct ast_conf_member *found = NULL;
-	struct ast_conf_member *member;
-	struct ast_conference *conf;
+	struct ast_conf_member *member ;
+	struct channel_bucket *bucket = &( channel_table[hash(chan) % CHANNEL_TABLE_SIZE] ) ;
 
 	ast_mutex_lock( &conflist_lock ) ;
 
-	conf = conflist;
+	AST_LIST_LOCK ( bucket ) ;
 
-	// loop through conf list
-	while ( conf != NULL && !found )
-	{
-		// lock conference
-		ast_rwlock_rdlock( &conf->lock );
-
-		member = conf->memberlist ;
-
-		while (member != NULL)
-		{
-		    if(!strcmp(member->channel_name, chan)) {
-			found = member;
-			if(lock)
-			    ast_mutex_lock(&member->lock);
-			break;
-		    }
-		    member = member->next;
+	AST_LIST_TRAVERSE ( bucket, member, hash_entry )
+		if (!strcmp (member->channel_name, chan) ) {
+			ast_mutex_lock (&member->lock) ;
+			member->use_count++ ;
+			break ;
 		}
 
-		// unlock conference
-		ast_rwlock_unlock( &conf->lock );
+	AST_LIST_UNLOCK ( bucket ) ;
 
-		conf = conf->next ;
-	}
-
-	// release mutex
 	ast_mutex_unlock( &conflist_lock ) ;
 
-	return found;
+	return member ;
 }
+
 #ifdef	VIDEO
 // All the VAD-based video switching magic happens here
 // This function should be called inside conference_exec
@@ -2958,35 +2912,32 @@ int play_sound_channel(int fd, const char *channel, char **file, int mute, int n
 	ast_cli(fd, "Playing sound %s to member %s %s\n",
 		      *file, channel, mute ? "with mute" : "");
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (member->moh_flag)
+	} else if (!member->moh_flag)
 	{
-		ast_mutex_unlock(&member->lock);
-		return 1 ;
-	}
 
-	while ( n-- > 0 ) {
-		if( !(newsound = calloc(1, sizeof(struct ast_conf_soundq))))
-		{
-			ast_mutex_unlock(&member->lock);
-			return 0;
+		while ( n-- > 0 ) {
+			if( !(newsound = calloc(1, sizeof(struct ast_conf_soundq))))
+				break ;
+
+			ast_copy_string(newsound->name, *file, sizeof(newsound->name));
+
+			// append sound to the end of the list.
+			for ( q=&member->soundq; *q; q = &((*q)->next) ) ;
+			*q = newsound;
+
+			file++;
 		}
 
-		ast_copy_string(newsound->name, *file, sizeof(newsound->name));
+		member->muted = mute;
 
-		// append sound to the end of the list.
-		for ( q=&member->soundq; *q; q = &((*q)->next) ) ;
-		*q = newsound;
-
-		file++;
 	}
-
-	member->muted = mute;
-
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
 
 	return 1 ;
@@ -3000,7 +2951,7 @@ int stop_sound_channel(int fd, const char *channel)
 
 	ast_cli( fd, "Stopping sounds to member %s\n", channel);
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if ( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
@@ -3016,6 +2967,8 @@ int stop_sound_channel(int fd, const char *channel)
 		sound->stopped = 1;
 		sound = next;
 	}
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
 
 	return 1;
@@ -3027,25 +2980,18 @@ int start_moh_channel(int fd, const char *channel)
 
 	ast_cli( fd, "Starting moh to member %s\n", channel);
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if ( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (member->norecv_audio || member->moh_flag)
+	} else if (!member->norecv_audio && !member->moh_flag)
 	{
-		ast_mutex_unlock(&member->lock);
-		return 1 ;
-	}
-
-	if (!member->soundq) {
-		member->moh_flag = member->muted = 1;
-		member->ready_for_outgoing = 0;
-		ast_moh_start(member->chan, NULL, NULL);
-	} else {
 		member->moh_flag = 1;
 	}
 
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
 
 	return 1;
@@ -3057,22 +3003,21 @@ int stop_moh_channel(int fd, const char *channel)
 
 	ast_cli( fd, "Stopping moh to member %s\n", channel);
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if ( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (member->norecv_audio || !member->moh_flag)
+	} else if (!member->norecv_audio && member->moh_flag)
 	{
-		ast_mutex_unlock(&member->lock);
-		return 1 ;
+		ast_moh_stop(member->chan);
+
+		member->moh_flag = member->muted = 0;
+		member->ready_for_outgoing = 1;
 	}
 
-	ast_moh_stop(member->chan);
-
-	member->moh_flag = member->muted = 0;
-	member->ready_for_outgoing = 1;
-
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
 
 	return 1;
@@ -3084,7 +3029,7 @@ int talk_volume_channel(int fd, const char *channel, int up)
 
 	ast_cli( fd, "Adjusting talk volume level %s for member %s\n", up ? "up" : "down", channel);
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if ( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
@@ -3093,7 +3038,10 @@ int talk_volume_channel(int fd, const char *channel, int up)
 
 	up ? member->talk_volume++ : member->talk_volume--;
 
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
+
 	return 1;
 }
 
@@ -3103,7 +3051,7 @@ int listen_volume_channel(int fd, const char *channel, int up)
 
 	ast_cli( fd, "Adjusting listen volume level %s for member %s\n", up ? "up" : "down", channel);
 
-	member = find_member(channel, 1);
+	member = find_member(channel);
 	if ( !member )
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
@@ -3112,7 +3060,10 @@ int listen_volume_channel(int fd, const char *channel, int up)
 
 	up ? member->listen_volume++ : member->listen_volume--;
 
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
+
 	return 1;
 }
 
@@ -3183,6 +3134,21 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 	return member->video_broadcast_active;
 }
 #endif
+
+int hash(const char *channel_name)
+{
+	int i = 0, h = 0, g;
+	while (channel_name[i])
+	{
+		h = (h << 4) + channel_name[i++];
+		if ( (g = h & 0xF0000000) )
+			h ^= g >> 24;
+		h &= ~g;
+	}
+	//ast_log(AST_CONF_DEBUG, "Hashed channel_name: %s to 0x%08x\n", channel_name, h);
+	return h;
+}
+
 int count_exec( struct ast_channel* chan, void* data )
 {
 	int res = 0;

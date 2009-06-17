@@ -59,6 +59,10 @@ struct ast_conf_member
 
 	char* uniqueid ;  // member's uniqueid
 
+	ast_cond_t delete_var ; // delete cv
+	int delete_flag ; // delete flag
+	int use_count ; // use count
+
 	// values passed to create_member () via *data
 	int priority ;	// highest priority gets the channel
 	char* flags ;	// raw member-type flags
@@ -230,8 +234,16 @@ struct ast_conf_member
 	short video_started;
 #endif
 
-	// pointer to next member in single-linked list
+	// pointer to next member in linked list
 	struct ast_conf_member* next ;
+#ifndef	VIDEO
+	// pointer to prev member in linked list
+	struct ast_conf_member* prev ;
+#endif
+	// pointer to member's bucket list head
+	struct channel_bucket *bucket;
+	// list entry for member's bucket list
+	AST_LIST_ENTRY(ast_conf_member) hash_entry ;
 
 	// accounting values
 	unsigned long frames_in ;

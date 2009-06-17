@@ -343,7 +343,7 @@ char *conference_kick(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a) 
 // kick member <channel>
 //
 static char conference_kickchannel_usage[] =
-	"Usage: konference kickchannel <conference_name> <channel>\n"
+	"Usage: konference kickchannel <channel>\n"
 	"       Kick channel from conference\n"
 ;
 
@@ -364,19 +364,22 @@ char *conference_kickchannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 	static char *choices[] = CONFERENCE_KICKCHANNEL_CHOICES;
 	NEWCLI_SWITCH(conference_kickchannel_command,conference_kickchannel_usage)
 #endif
-	if ( argc < 4 )
+	if ( argc < 3 )
 		return SHOWUSAGE ;
 
-	const char *name = argv[2] ;
-	const char *channel = argv[3];
+	const char *channel = argv[2];
 
-	int res = kick_channel( name, channel );
-
-	if ( !res )
-	{
-		ast_cli( fd, "Cannot kick channel %s in conference %s\n", channel, name);
-		return FAILURE;
+	struct ast_conf_member *member = find_member(channel);
+	if(!member) {
+	    ast_cli(fd, "Member %s not found\n", channel);
+	    return FAILURE;
 	}
+
+	member->kick_flag = 1;
+
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
+	ast_mutex_unlock( &member->lock ) ;
 
 	return SUCCESS ;
 }
@@ -488,16 +491,26 @@ char *conference_mutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 	if ( argc < 3 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[2];
+	const char *channel = argv[2];
 
-	struct ast_conf_member *member = find_member(channel, 1);
+	struct ast_conf_member *member = find_member(channel);
 	if(!member) {
 	    ast_cli(fd, "Member %s not found\n", channel);
 	    return FAILURE;
 	}
 
 	member->muted = member->mute_audio = 1;
+
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock( &member->lock ) ;
+
+	manager_event(
+		EVENT_FLAG_CALL,
+		"ConferenceMemberMute",
+		"Channel: %s\r\n",
+		channel
+	) ;
 
 	ast_cli( fd, "Channel #: %s muted\n", argv[2]) ;
 
@@ -691,16 +704,26 @@ char *conference_unmutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_
 	if ( argc < 3 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[2];
+	const char *channel = argv[2];
 
-	struct ast_conf_member *member = find_member(channel, 1);
+	struct ast_conf_member *member = find_member(channel);
 	if(!member) {
 	    ast_cli(fd, "Member %s not found\n", channel);
 	    return FAILURE;
 	}
 
 	member->muted = member->mute_audio = 0;
+
+	if ( !--member->use_count && member->delete_flag )
+		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock( &member->lock ) ;
+
+	manager_event(
+		EVENT_FLAG_CALL,
+		"ConferenceMemberUnmute",
+		"Channel: %s\r\n",
+		channel
+	) ;
 
 	ast_cli( fd, "Channel #: %s unmuted\n", argv[2]) ;
 
@@ -736,7 +759,7 @@ char *conference_play_sound(struct ast_cli_entry *e, int cmd, struct ast_cli_arg
 	if ( argc < 5 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[3];
+	const char *channel = argv[3];
 	char **file = &argv[4];
 
 	int mute = (argc > 5 && !strcmp(argv[argc-1], "mute")?1:0);
@@ -779,7 +802,7 @@ char *conference_stop_sounds(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 	if ( argc < 4 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[3];
+	const char *channel = argv[3];
 
 	int res = stop_sound_channel(fd, channel);
 
@@ -819,7 +842,7 @@ char *conference_start_moh(struct ast_cli_entry *e, int cmd, struct ast_cli_args
 	if ( argc < 4 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[3];
+	const char *channel = argv[3];
 
 	int res = start_moh_channel(fd, channel);
 
@@ -859,7 +882,7 @@ char *conference_stop_moh(struct ast_cli_entry *e, int cmd, struct ast_cli_args 
 	if ( argc < 4 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[3];
+	const char *channel = argv[3];
 
 	int res = stop_moh_channel(fd, channel);
 
@@ -900,7 +923,7 @@ char *conference_talkvolume(struct ast_cli_entry *e, int cmd, struct ast_cli_arg
 	if ( argc < 4 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[2];
+	const char *channel = argv[2];
 
 	int up;
 	if ( strncasecmp( argv[3], "up", 2 ) == 0 )
@@ -948,7 +971,7 @@ char *conference_listenvolume(struct ast_cli_entry *e, int cmd, struct ast_cli_a
 	if ( argc < 4 )
 		return SHOWUSAGE ;
 
-	char *channel = argv[2];
+	const char *channel = argv[2];
 
 	int up;
 	if ( strncasecmp( argv[3], "up", 2 ) == 0 )

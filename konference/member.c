@@ -436,18 +436,6 @@ static int process_outgoing(struct ast_conf_member *member)
 			{
 				// if we didn't get anything, just revert to "normal"
 				f = realframe;
-/*
-			} else
-			{
-				// We have a sound frame now, but we need to make sure it's the same
-				// format as our channel write format
-				int wf = member->chan->writeformat & AST_FORMAT_AUDIO_MASK;
-				if ( f->frametype == AST_FRAME_VOICE && !(wf & f->subclass) )
-				{
-					// We need to change our channel's write format
-					ast_set_write_format(member->chan, f->subclass);
-				}
-*/
 			}
 		} else {
 			if (member->moh_flag) {
@@ -628,15 +616,6 @@ static int process_outgoing(struct ast_conf_member *member)
 	return 0;
 }
 
-static int member_checkkick( struct ast_conf_member *member )
-{
-	int kick;
-	ast_mutex_lock( &member->lock ) ;
-	kick = member->kick_flag;
-	ast_mutex_unlock( &member->lock ) ;
-	return kick;
-}
-
 //
 // main member thread function
 //
@@ -653,6 +632,8 @@ int member_exec( struct ast_channel* chan, void* data )
 
 	int left = 0 ;
 	int res;
+
+	short kick_flag ;
 
 	ast_log( AST_CONF_DEBUG, "Begin processing member thread, channel => %s\n", chan->name ) ;
 
@@ -830,7 +811,7 @@ int member_exec( struct ast_channel* chan, void* data )
 
 		}
 
-		if (member_checkkick(member)) break;
+		if ((kick_flag = (conf->kick_flag || member->kick_flag))) break;
 
 		//-----------------//
 		// OUTGOING FRAMES //
@@ -862,7 +843,7 @@ int member_exec( struct ast_channel* chan, void* data )
 //	int expected_frames = ( int )( floor( (double)( msecdiff( &end, &start ) / AST_CONF_FRAME_INTERVAL ) ) ) ;
 //	ast_log( AST_CONF_DEBUG, "expected_frames => %d\n", expected_frames ) ;
 
-	pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "KICKED");
+	pbx_builtin_setvar_helper(member->chan, "KONFERENCE", (kick_flag ? "KICKED" : "HANGUP"));
 
 	remove_member( member, conf ) ;
 	return 0 ;
@@ -929,6 +910,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// initialize mutex
 	ast_mutex_init( &member->lock ) ;
+
+	// initialize cv
+	ast_cond_init( &member->delete_var, NULL ) ;
+	// initialize flag and count
+	member->delete_flag = member->use_count = 0 ;
 
 	// Default values for parameters that can get overwritten by dialplan arguments
 #ifdef	VIDEO
@@ -1025,7 +1011,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		{
 			member->max_users = strtol(value, (char **)NULL, 10);;
 			ast_log(AST_CONF_DEBUG, "max_users = %d\n", member->max_users);
-			ast_log(LOG_NOTICE, "max_users = %d\n", member->max_users);
 		} else
 		{
 			ast_log(LOG_WARNING, "unknown parameter %s with value %s\n", key, value);
@@ -1142,9 +1127,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	member->video_started = 0;
 #endif
-	// linked-list pointer
+	// linked-list pointers
 	member->next = NULL ;
-
+#ifndef	VIDEO
+	member->prev = NULL ;
+#endif
 	// account data
 	member->frames_in = 0 ;
 	member->frames_in_dropped = 0 ;
@@ -1516,6 +1503,14 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 		ast_log( LOG_WARNING, "unable to the delete null member\n" ) ;
 		return NULL ;
 	}
+
+	ast_mutex_lock ( &member->lock ) ;
+
+	member->delete_flag = 1 ;
+	if ( member->use_count )
+		ast_cond_wait ( &member->delete_var, &member->lock ) ;
+
+	ast_mutex_unlock ( &member->lock ) ;
 
 #ifdef	VIDEO
 	// If member is driving another member, make sure its speaker count is correct
@@ -3216,7 +3211,7 @@ int queue_silent_frame(
 )
 {
   int c;
-#ifdef APP_CONFERENCE_DEBUG
+#ifdef APP_KONFERENCE_DEBUG
 	//
 	// check inputs
 	//
@@ -3232,7 +3227,7 @@ int queue_silent_frame(
 		ast_log( AST_CONF_DEBUG, "unable to queue silent frame for null member\n" ) ;
 		return -1 ;
 	}
-#endif // APP_CONFERENCE_DEBUG
+#endif // APP_KONFERENCE_DEBUG
 
 	//
 	// initialize static variables

@@ -42,6 +42,9 @@
 // struct declarations
 //
 
+AST_LIST_HEAD (channel_bucket, ast_conf_member) ;
+struct channel_bucket *channel_table ;
+
 typedef struct ast_conference_stats
 {
 	// conference name ( copied for ease of use )
@@ -76,6 +79,10 @@ struct ast_conference
 
 	// single-linked list of members in conference
 	struct ast_conf_member* memberlist ;
+#ifndef	VIDEO
+	// pointer to last member in list
+	struct ast_conf_member* memberlast ;
+#endif
 	int membercount ;
         int id_count;
 #ifdef	VIDEO
@@ -120,6 +127,9 @@ struct ast_conference
 #endif	
 	// 1 => on, 0 => off
 	short debug_flag ;
+
+	// flag indicating we should remove this member
+	short kick_flag ;
 } ;
 
 
@@ -129,20 +139,22 @@ struct ast_conference
 // function declarations
 //
 
+int hash( const char *channel_name ) ;
+
 int count_exec( struct ast_channel* chan, void* data ) ;
 
 struct ast_conference* join_conference( struct ast_conf_member* member ) ;
 
 int end_conference( const char *name, int hangup ) ;
 
-// find a particular member, locking if requested.
-struct ast_conf_member *find_member ( const char *chan, int lock) ;
+// Find a particular member, locked if found.
+struct ast_conf_member *find_member( const char *chan ) ;
 
 int queue_frame_for_listener( struct ast_conference* conf, struct ast_conf_member* member, conf_frame* frame ) ;
 int queue_frame_for_speaker( struct ast_conference* conf, struct ast_conf_member* member, conf_frame* frame ) ;
 int queue_silent_frame( struct ast_conference* conf, struct ast_conf_member* member ) ;
 
-int remove_member( struct ast_conf_member* member, struct ast_conference* conf ) ;
+void remove_member( struct ast_conf_member* member, struct ast_conference* conf ) ;
 
 #ifdef	TEXT
 int send_text_message_to_member(struct ast_conf_member *member, const char *text);

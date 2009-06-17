@@ -68,7 +68,7 @@ conf_frame* mix_frames( conf_frame* frames_in, int speaker_count, int listener_c
 
 conf_frame* mix_single_speaker( conf_frame* frames_in, int volume )
 {
-#ifdef APP_CONFERENCE_DEBUG
+#ifdef APP_KONFERENCE_DEBUG
 	// ast_log( AST_CONF_DEBUG, "returning single spoken frame\n" ) ;
 
 	//
@@ -92,7 +92,7 @@ conf_frame* mix_single_speaker( conf_frame* frames_in, int volume )
 		ast_log( AST_CONF_DEBUG, "unable to mix single spoken frame with null member\n" ) ;
 		return NULL ;
 	}
-#endif // APP_CONFERENCE_DEBUG
+#endif // APP_KONFERENCE_DEBUG
 
 	//
 	// 'mix' the frame
@@ -162,7 +162,7 @@ conf_frame* mix_multiple_speakers(
 	int volume
 )
 {
-#ifdef APP_CONFERENCE_DEBUG
+#ifdef APP_KONFERENCE_DEBUG
 	//
 	// check input
 	//
@@ -180,7 +180,7 @@ conf_frame* mix_multiple_speakers(
 		ast_log( AST_CONF_DEBUG, "mix_multiple_speakers() called with less than two speakers\n" ) ;
 		return NULL ;
 	}
-#endif // APP_CONFERENCE_DEBUG
+#endif // APP_KONFERENCE_DEBUG
 
 	//
 	// at this point we know that there is more than one frame,

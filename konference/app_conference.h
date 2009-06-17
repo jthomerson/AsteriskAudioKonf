@@ -71,7 +71,7 @@
 // debug logging level
 
 // LOG_NOTICE for debugging, LOG_DEBUG for production
-#ifdef APP_CONFERENCE_DEBUG
+#ifdef APP_KONFERENCE_DEBUG
 #define AST_CONF_DEBUG LOG_NOTICE
 #else
 #define AST_CONF_DEBUG LOG_DEBUG

@@ -19,9 +19,9 @@ the command line.
 Added conference parameter, max_users, that limits conference members to a user
 specified maximum.
 
-Added channel variable, KONFERENCE, which is set to MAXUSERS or KICKED after
-exiting the application so that the reason for leaving a conference can be
-determined in the dial plan.
+Added channel variable, KONFERENCE, which is set to MAXUSERS, KICKED, or HANGUP
+after exiting the application so that the reason for leaving a conference can
+be determined in the dial plan.
 
 Added application, KonferenceCount, was so that the member count can be used in
 the dial plan.
@@ -52,3 +52,26 @@ change the defaults in the Makefile or specify them on the command line: make
 VIDEO=1 TEXT=1 DTMF=1. 
 
 Added an examples directory for a simple AMI based application and web site.
+
+Changed find_member so that members are located via a hash table rather than a
+sequential search through the conference and member lists.  The size of the
+table is configurable via the Makefile and the default is 997 buckets.  To
+change the default table size either edit the Makefile default or specify the
+value on the command line: make CHANNEL_TABLE_SIZE=1009.  Table entries are
+list heads and chaining is used to resolve collisions so that the number of
+entries is not limited to the number of buckets in the table.  A bucket field
+is added to the conference list command output so that a channel name can be
+correlated with its hash table entry.
+
+Changed add_member and remove_member for voice so that adding or removing a
+member control block is O(1).  Specifically, the allocation of member id's is
+changed to work like MeetMe, that is, the member id list is ordered, new
+entries are placed at the end of the list, and the next member id  allocated is
+the highest active id (the entry at the end of the list) plus one.  Further,
+member control blocks are doubly linked so that removing a block doesn't
+require running the list to find the back pointer required to update the member
+list.
+
+Changed conference_kickchannel, dropping the conference name argument, so that
+its signature is consistent with the other commands which refer to a member by
+channel name.
