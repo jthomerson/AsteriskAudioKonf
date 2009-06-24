@@ -94,6 +94,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 				EVENT_FLAG_CALL,
 				"ConferenceDTMF",
 				"ConferenceName: %s\r\n"
+				"Type: %s\r\n"
 				"UniqueID: %s\r\n"
 				"Channel: %s\r\n"
 				"CallerID: %s\r\n"
@@ -103,6 +104,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 				"Flags: %s\r\n"
 				"Mute: %d\r\n",
 				conf->name,
+				member->type,
 				member->uniqueid,
 				member->channel_name,
 				member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
@@ -700,8 +702,9 @@ int member_exec( struct ast_channel* chan, void* data )
 	if ( conf == NULL )
 	{
 		ast_log( LOG_ERROR, "unable to setup member conference\n" ) ;
+		int res = (member->max_users_flag ? 0 : -1 ) ;
 		delete_member( member) ;
-		return (!member->max_users ? -1 : 0) ;
+		return res ;
 	}
 
 
@@ -709,6 +712,7 @@ int member_exec( struct ast_channel* chan, void* data )
 		EVENT_FLAG_CALL,
 		"ConferenceJoin",
 		"ConferenceName: %s\r\n"
+		"Type: %s\r\n"
 		"UniqueID: %s\r\n"
 		"Member: %d\r\n"
 		"Flags: %s\r\n"
@@ -718,6 +722,7 @@ int member_exec( struct ast_channel* chan, void* data )
 		"Moderators: %d\r\n"
 		"Count: %d\r\n",
 		conf->name,
+		member->type,
 		member->uniqueid,
 		member->id,
 		member->flags,
@@ -811,7 +816,10 @@ int member_exec( struct ast_channel* chan, void* data )
 
 		}
 
-		if ((kick_flag = (conf->kick_flag || member->kick_flag))) break;
+		if ((kick_flag = (conf->kick_flag || member->kick_flag))) {
+			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "KICKED" );
+			break;
+		}
 
 		//-----------------//
 		// OUTGOING FRAMES //
@@ -842,8 +850,6 @@ int member_exec( struct ast_channel* chan, void* data )
 //	end = ast_tvnow();
 //	int expected_frames = ( int )( floor( (double)( msecdiff( &end, &start ) / AST_CONF_FRAME_INTERVAL ) ) ) ;
 //	ast_log( AST_CONF_DEBUG, "expected_frames => %d\n", expected_frames ) ;
-
-	pbx_builtin_setvar_helper(member->chan, "KONFERENCE", (kick_flag ? "KICKED" : "HANGUP"));
 
 	remove_member( member, conf ) ;
 	return 0 ;
@@ -925,6 +931,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->vad_prob_start = AST_CONF_PROB_START;
 	member->vad_prob_continue = AST_CONF_PROB_CONTINUE;
 	member->max_users = AST_CONF_MAX_USERS;
+	member->type = NULL;
 
 	//
 	// initialize member with passed data values
@@ -976,6 +983,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		static const char arg_video_stop_timeout[] = "video_stop_timeout";
 #endif
 		static const char arg_max_users[] = "max_users";
+		static const char arg_conf_type[] = "type";
 
 		char *value = token;
 		const char *key = strsep(&value, "=");
@@ -1000,17 +1008,22 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #ifdef	VIDEO
 		} else if ( strncasecmp(key, arg_video_start_timeout, sizeof(arg_video_start_timeout) - 1) == 0 )
 		{
-			member->video_start_timeout = strtol(value, (char **)NULL, 10);;
+			member->video_start_timeout = strtol(value, (char **)NULL, 10);
 			ast_log(AST_CONF_DEBUG, "video_start_timeout = %d\n", member->video_start_timeout);
 		} else if ( strncasecmp(key, arg_video_stop_timeout, sizeof(arg_video_stop_timeout) - 1) == 0 )
 		{
-			member->video_stop_timeout = strtol(value, (char **)NULL, 10);;
+			member->video_stop_timeout = strtol(value, (char **)NULL, 10);
 			ast_log(AST_CONF_DEBUG, "video_stop_timeout = %d\n", member->video_stop_timeout);
 #endif
 		} else if ( strncasecmp(key, arg_max_users, sizeof(arg_max_users) - 1) == 0 )
 		{
-			member->max_users = strtol(value, (char **)NULL, 10);;
+			member->max_users = strtol(value, (char **)NULL, 10);
 			ast_log(AST_CONF_DEBUG, "max_users = %d\n", member->max_users);
+		} else if ( strncasecmp(key, arg_conf_type, sizeof(arg_conf_type) - 1) == 0 )
+		{
+			member->type = malloc( strlen( value ) + 1 ) ;
+			strcpy( member->type, value ) ;
+			ast_log(AST_CONF_DEBUG, "type = %s\n", member->type);
 		} else
 		{
 			ast_log(LOG_WARNING, "unknown parameter %s with value %s\n", key, value);
@@ -1031,6 +1044,13 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// copy the uniqueid
 	member->uniqueid = malloc( strlen( chan->uniqueid ) + 1 ) ;
 	strcpy( member->uniqueid, chan->uniqueid ) ;
+
+	// set default if no type parameter
+	if (!member->type) {
+		member->type = malloc( strlen( AST_CONF_TYPE_DEFAULT ) + 1 ) ;
+		strcpy( member->type, AST_CONF_TYPE_DEFAULT ) ;
+		ast_log(AST_CONF_DEBUG, "type = %s\n", member->type);
+	}
 
 	// ( default can be overridden by passed flags )
 	member->mute_audio = 0;
@@ -1161,6 +1181,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// flags
 	member->kick_flag = 0;
+	member->max_users_flag = 0;
 
 	// record start time
 	// init dropped frame timestamps
@@ -1301,10 +1322,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// if the user is coming in via the telephone,
 	// and is not listen-only
 	//
-	if (
-		member->via_telephone == 1
-		&& member->type != 'L'
-	)
+	if ( member->via_telephone == 1)
 	{
 		// create a speex preprocessor
 		member->dsp = speex_preprocess_state_init( AST_CONF_BLOCK_SAMPLES, AST_CONF_SAMPLE_RATE ) ;
@@ -1331,24 +1349,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		}
 	}
 #endif
-
-	//
-	// set connection type
-	//
-
-	if ( member->via_telephone == 1 )
-	{
-		member->connection_type = 'T' ;
-	}
-	else if ( strncmp( member->channel_name, "SIP", 3 ) == 0 )
-	{
-		member->connection_type = 'S' ;
-	}
-	else // default to iax
-	{
-		member->connection_type = 'X' ;
-	}
-
 	//
 	// read, write, and translation options
 	//
@@ -1484,7 +1484,9 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// finish up
 	//
 
-	ast_log( AST_CONF_DEBUG, "created member, type => %c, priority => %d, readformat => %d\n",
+	//ast_log( AST_CONF_DEBUG, "created member, type => %s, priority => %d, readformat => %d\n",
+		//member->type, member->priority, chan->readformat ) ;
+	ast_log( LOG_NOTICE, "created member, type => %s, priority => %d, readformat => %d\n",
 		member->type, member->priority, chan->readformat ) ;
 
 	return member ;
@@ -1611,8 +1613,8 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	// free the member's copy of the conference name
 	free(member->conf_name);
 
-	// !!! DEBUGING !!!
-	ast_log( AST_CONF_DEBUG, "freeing member\n" ) ;
+	// free the member's copy of the conference type
+	free(member->type);
 
 	// free the member's memory
 	free(member->callerid);
@@ -1630,6 +1632,9 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 		free( sound );
 		sound = next;
 	}
+
+	// !!! DEBUGING !!!
+	ast_log( AST_CONF_DEBUG, "freeing member\n" ) ;
 
 	free( member ) ;
 	member = NULL ;

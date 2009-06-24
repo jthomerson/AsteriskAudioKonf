@@ -221,9 +221,14 @@
 #endif
 
 //
-// Default max users conference is zero, that is, unbounded
+// Default conference max users is zero, that is, unbounded
 //
 #define AST_CONF_MAX_USERS 0
+
+//
+// Default conference type
+//
+#define AST_CONF_TYPE_DEFAULT "konference"
 
 #ifdef	VIDEO
 //

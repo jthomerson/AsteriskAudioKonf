@@ -19,9 +19,9 @@ the command line.
 Added conference parameter, max_users, that limits conference members to a user
 specified maximum.
 
-Added channel variable, KONFERENCE, which is set to MAXUSERS, KICKED, or HANGUP
-after exiting the application so that the reason for leaving a conference can
-be determined in the dial plan.
+Added channel variable, KONFERENCE, which is set to MAXUSERS or KICKED after
+exiting the application so that the reason for leaving a conference can be
+determined in the dial plan.
 
 Added application, KonferenceCount, was so that the member count can be used in
 the dial plan.
@@ -75,3 +75,8 @@ list.
 Changed conference_kickchannel, dropping the conference name argument, so that
 its signature is consistent with the other commands which refer to a member by
 channel name.
+
+Added conference parameter, type, that can be used to partition users into
+groups within a conference which can be managed differently via the AMI. The
+ConferenceJoin, ConferenceLeave, and ConferenceDTMF events are updated to
+include the new type field.

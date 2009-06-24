@@ -580,9 +580,9 @@ struct ast_conference* join_conference( struct ast_conf_member* member )
 		if (!member->max_users || (member->max_users > conf->membercount)) {
 			add_member( member, conf ) ;
 		} else {
-			ast_log( LOG_NOTICE, "max users exceeded: member count = %d\n", conf->membercount ) ;
+			ast_log( LOG_NOTICE, "conference %s max users exceeded: member count = %d\n", conf->name, conf->membercount ) ;
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "MAXUSERS");
-
+			member->max_users_flag = 1;
 			conf = NULL;
 		}
 	}
@@ -888,11 +888,6 @@ int end_conference(const char *name, int hangup )
 // This function should be called with conflist_lock held
 static void add_member( struct ast_conf_member *member, struct ast_conference *conf )
 {
-#ifdef	VIDEO
-        int newid;
-        struct ast_conf_member *othermember;
-#endif
-
 	if ( conf == NULL )
 	{
 		ast_log( LOG_ERROR, "unable to add member to NULL conference\n" ) ;
@@ -902,7 +897,16 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	// acquire the conference lock
 	ast_rwlock_wrlock( &conf->lock ) ;
 
+	// update conference stats
+	conf->membercount++;
+
+	if (member->ismoderator)
+		conf->stats.moderators++;
+
 #ifdef	VIDEO
+        int newid;
+        struct ast_conf_member *othermember;
+
 	if (member->id < 0)
 	{
 		// get an ID for this member
@@ -919,14 +923,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 			othermember = othermember->next;
 		}
 	}
-#endif
-	// update conference stats
-	conf->membercount++;
 
-	if (member->ismoderator)
-		conf->stats.moderators++;
-
-#ifdef	VIDEO
 	// The conference sets chat mode according to the latest member chat flag
 	conf->does_chat_mode = member->does_chat_mode;
 
@@ -981,6 +978,9 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	}
 #endif
 
+	// release the conference lock
+	ast_rwlock_unlock( &conf->lock ) ;
+
 	// add member to channel table
 	member->bucket = &(channel_table[hash(member->chan->name) % CHANNEL_TABLE_SIZE]);
 
@@ -992,14 +992,15 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 
 	ast_log( AST_CONF_DEBUG, "member added to conference, name => %s\n", conf->name ) ;
 
-	// release the conference lock
-	ast_rwlock_unlock( &conf->lock ) ;
-
 	return ;
 }
 
 void remove_member( struct ast_conf_member* member, struct ast_conference* conf )
 {
+	int membercount ;
+	short moderators ;
+	long tt ;
+
 	// check for member
 	if ( member == NULL )
 	{
@@ -1021,11 +1022,13 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 
 	ast_rwlock_wrlock( &conf->lock );
 
+	if ( member->ismoderator && member->kick_conferees )
+		conf->kick_flag = 1 ;
+
 #ifdef	VIDEO
 	struct ast_conf_member *member_list = conf->memberlist ;
 	struct ast_conf_member *member_temp = NULL ;
 #else
-	struct ast_conf_member *member_list = member ;
 	struct ast_conf_member *member_temp = member->prev ;
 #endif
 
@@ -1043,10 +1046,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 	}
 
 	member_list = conf->memberlist ;
-#endif
-	conf->kick_flag = ( member->ismoderator && member->kick_conferees ? 1 : 0 );
 
-#ifdef	VIDEO
 	while ( member_list != NULL )
 	{
 		// If member is driven by the currently visited member, break the association
@@ -1068,7 +1068,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 			//
 
 			// calculate time in conference (in seconds)
-			long tt = ast_tvdiff_ms(ast_tvnow(),
+			tt = ast_tvdiff_ms(ast_tvnow(),
 					member->time_entered) / 1000;
 
 			if (conf->debug_flag)
@@ -1100,10 +1100,10 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 				conf->memberlast = ( member_temp == NULL ? NULL : member_temp );
 #endif
 			// update conference stats
-			--conf->membercount;
+			membercount = --conf->membercount;
 
-			if (member->ismoderator)
-				conf->stats.moderators--;
+			// update moderator count
+			moderators = (!member->ismoderator ? conf->stats.moderators : --conf->stats.moderators );
 #ifdef	VIDEO
 			// Check if member is the default or current video source
 			if ( conf->current_video_source_id == member->id )
@@ -1129,54 +1129,10 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 					member->channel_name
 					);
 			}
-#endif
-			// output to manager...
-			manager_event(
-				EVENT_FLAG_CALL,
-				"ConferenceLeave",
-				"ConferenceName: %s\r\n"
-				"UniqueID: %s\r\n"
-				"Member: %d\r\n"
-				"Flags: %s\r\n"
-				"Channel: %s\r\n"
-				"CallerID: %s\r\n"
-				"CallerIDName: %s\r\n"
-				"Duration: %ld\r\n"
-				"Moderators: %d\r\n"
-				"Count: %d\r\n",
-				conf->name,
-				member->uniqueid,
-				member->id,
-				member->flags,
-				member->channel_name,
-				member->callerid,
-				member->callername,
-				tt,
-				conf->stats.moderators,
-				conf->membercount
-			) ;
 
-			// save a pointer to the current member,
-			// and then point to the next member in the list
+			// point to the next member in the list
 			member_list = member_list->next ;
 
-			// remove member from channel table
-			AST_LIST_LOCK (member->bucket ) ;
-			AST_LIST_REMOVE (member->bucket, member, hash_entry) ;
-			AST_LIST_UNLOCK (member->bucket ) ;
-
-			//ast_log( AST_CONF_DEBUG, "Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
-
-			// leave member_temp alone.
-			// it already points to the previous (or NULL).
-			// it will still be the previous after member is deleted
-
-			// delete the member
-			delete_member( member ) ;
-
-			ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
-					conf->name, conf->membercount ) ;
-#ifdef	VIDEO
 			//break ;
 		}
 		else
@@ -1189,6 +1145,47 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 	}
 #endif
 	ast_rwlock_unlock( &conf->lock );
+
+	// remove member from channel table
+	AST_LIST_LOCK (member->bucket ) ;
+	AST_LIST_REMOVE (member->bucket, member, hash_entry) ;
+	AST_LIST_UNLOCK (member->bucket ) ;
+
+	//ast_log( AST_CONF_DEBUG, "Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
+
+	ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
+			member->conf_name, membercount ) ;
+
+	// output to manager...
+	manager_event(
+		EVENT_FLAG_CALL,
+		"ConferenceLeave",
+		"ConferenceName: %s\r\n"
+		"Type:  %s\r\n"
+		"UniqueID: %s\r\n"
+		"Member: %d\r\n"
+		"Flags: %s\r\n"
+		"Channel: %s\r\n"
+		"CallerID: %s\r\n"
+		"CallerIDName: %s\r\n"
+		"Duration: %ld\r\n"
+		"Moderators: %d\r\n"
+		"Count: %d\r\n",
+		member->conf_name,
+		member->type,
+		member->uniqueid,
+		member->id,
+		member->flags,
+		member->channel_name,
+		member->callerid,
+		member->callername,
+		tt,
+		moderators,
+		membercount
+	) ;
+
+	// delete the member
+	delete_member( member ) ;
 
 }
 
@@ -1959,8 +1956,6 @@ struct ast_conf_member *find_member( const char *chan )
 	struct ast_conf_member *member ;
 	struct channel_bucket *bucket = &( channel_table[hash(chan) % CHANNEL_TABLE_SIZE] ) ;
 
-	ast_mutex_lock( &conflist_lock ) ;
-
 	AST_LIST_LOCK ( bucket ) ;
 
 	AST_LIST_TRAVERSE ( bucket, member, hash_entry )
@@ -1971,8 +1966,6 @@ struct ast_conf_member *find_member( const char *chan )
 		}
 
 	AST_LIST_UNLOCK ( bucket ) ;
-
-	ast_mutex_unlock( &conflist_lock ) ;
 
 	return member ;
 }

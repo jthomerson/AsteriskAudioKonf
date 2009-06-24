@@ -66,9 +66,10 @@ struct ast_conf_member
 	// values passed to create_member () via *data
 	int priority ;	// highest priority gets the channel
 	char* flags ;	// raw member-type flags
-	char type ;		// L = ListenOnly, M = Moderator, S = Standard (Listen/Talk)
+	char *type ;		// conference type
 	char* conf_name ;		// name of the conference that own this member
 	int max_users ; // zero or max users for this conference
+	short max_users_flag ;
 
 	char *callerid;
 	char *callername;
@@ -108,9 +109,6 @@ struct ast_conf_member
 	// is this person a moderator?
 	int ismoderator;
 	int kick_conferees;
-
-	// determine by flags and channel name
-	char connection_type ; // T = telephone, X = iaxclient, S = sip
 
 	// vad voice probability thresholds
 	float vad_prob_start ;
