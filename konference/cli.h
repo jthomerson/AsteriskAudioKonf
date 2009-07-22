@@ -46,10 +46,11 @@
 
 int conference_show_stats( int fd, int argc, char *argv[] ) ;
 
+int conference_version( int fd, int argc, char *argv[] );
+
 int conference_restart( int fd, int argc, char *argv[] );
 
 int conference_debug( int fd, int argc, char *argv[] ) ;
-int conference_no_debug( int fd, int argc, char *argv[] ) ;
 
 int conference_list( int fd, int argc, char *argv[] ) ;
 int conference_kick( int fd, int argc, char *argv[] ) ;
@@ -108,10 +109,11 @@ int conference_drivechannel(int fd, int argc, char *argv[] );
 
 char *conference_show_stats(struct ast_cli_entry *, int, struct ast_cli_args *) ;
 
+char *conference_version(struct ast_cli_entry *, int, struct ast_cli_args *);
+
 char *conference_restart(struct ast_cli_entry *, int, struct ast_cli_args *);
 
 char *conference_debug(struct ast_cli_entry *, int, struct ast_cli_args *) ;
-char *conference_no_debug(struct ast_cli_entry *, int, struct ast_cli_args *) ;
 
 char *conference_list(struct ast_cli_entry *, int, struct ast_cli_args *) ;
 char *conference_kick(struct ast_cli_entry *, int, struct ast_cli_args *) ;

@@ -64,6 +64,39 @@ switch (cmd) { \
 #endif
 
 //
+// version 
+//
+static char conference_version_usage[] =
+	"Usage: konference version\n"
+	"       Display konference version\n"
+;
+
+#define CONFERENCE_VERSION_CHOICES { "konference", "version", NULL }
+static char conference_version_summary[] = "Display konference version";
+
+#ifndef AST_CLI_DEFINE
+static struct ast_cli_entry cli_version = {
+	CONFERENCE_VERSION_CHOICES,
+	conference_version,
+	conference_version_summary,
+	conference_version_usage
+} ;
+int conference_version( int fd, int argc, char *argv[] ) {
+#else
+static char conference_version_command[] = "konference version";
+char *conference_version(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a) {
+	static char *choices[] = CONFERENCE_VERSION_CHOICES;
+	NEWCLI_SWITCH(conference_version_command,conference_version_usage)
+#endif
+	if ( argc < 2 )
+		return SHOWUSAGE ;
+
+	ast_cli( fd, "app_konference revision %s\n", REVISION) ;
+
+	return SUCCESS ;
+}
+
+//
 // restart conference
 //
 static char conference_restart_usage[] =
@@ -1701,6 +1734,7 @@ char *conference_drivechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_a
 
 #ifdef AST_CLI_DEFINE
 static struct ast_cli_entry app_konference_commands[] = {
+	AST_CLI_DEFINE(conference_version, conference_version_summary),
 	AST_CLI_DEFINE(conference_restart, conference_restart_summary),
 	AST_CLI_DEFINE(conference_debug, conference_debug_summary),
 	AST_CLI_DEFINE(conference_show_stats, conference_show_stats_summary),
@@ -1753,6 +1787,7 @@ void register_conference_cli( void )
 #ifdef AST_CLI_DEFINE
 	ast_cli_register_multiple(app_konference_commands, sizeof(app_konference_commands)/sizeof(struct ast_cli_entry));
 #else
+	ast_cli_register( &cli_version );
 	ast_cli_register( &cli_restart );
 	ast_cli_register( &cli_debug ) ;
 	ast_cli_register( &cli_show_stats ) ;
@@ -1808,6 +1843,7 @@ void unregister_conference_cli( void )
 #ifdef AST_CLI_DEFINE
 	ast_cli_unregister_multiple(app_konference_commands, sizeof(app_konference_commands)/sizeof(struct ast_cli_entry));
 #else
+	ast_cli_unregister( &cli_version );
 	ast_cli_unregister( &cli_restart );
 	ast_cli_unregister( &cli_debug ) ;
 	ast_cli_unregister( &cli_show_stats ) ;

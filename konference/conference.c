@@ -981,15 +981,6 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	// release the conference lock
 	ast_rwlock_unlock( &conf->lock ) ;
 
-	// add member to channel table
-	member->bucket = &(channel_table[hash(member->chan->name) % CHANNEL_TABLE_SIZE]);
-
-	AST_LIST_LOCK (member->bucket ) ;
-	AST_LIST_INSERT_HEAD (member->bucket, member, hash_entry) ;
-	AST_LIST_UNLOCK (member->bucket ) ;
-
-	//ast_log( AST_CONF_DEBUG, "Added %s to the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
-
 	ast_log( AST_CONF_DEBUG, "member added to conference, name => %s\n", conf->name ) ;
 
 	return ;
@@ -1146,15 +1137,15 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 #endif
 	ast_rwlock_unlock( &conf->lock );
 
+	ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
+			member->conf_name, membercount ) ;
+
 	// remove member from channel table
 	AST_LIST_LOCK (member->bucket ) ;
 	AST_LIST_REMOVE (member->bucket, member, hash_entry) ;
 	AST_LIST_UNLOCK (member->bucket ) ;
 
 	//ast_log( AST_CONF_DEBUG, "Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
-
-	ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
-			member->conf_name, membercount ) ;
 
 	// output to manager...
 	manager_event(

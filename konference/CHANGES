@@ -80,3 +80,7 @@ Added conference parameter, type, that can be used to partition users into
 groups within a conference which can be managed differently via the AMI. The
 ConferenceJoin, ConferenceLeave, and ConferenceDTMF events are updated to
 include the new type field.
+
+Added command to display the conference version number. The version number is
+either the konference release number or the subversion revision number if the
+code was checked out from the konference repository.

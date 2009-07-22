@@ -635,8 +635,6 @@ int member_exec( struct ast_channel* chan, void* data )
 	int left = 0 ;
 	int res;
 
-	short kick_flag ;
-
 	ast_log( AST_CONF_DEBUG, "Begin processing member thread, channel => %s\n", chan->name ) ;
 
 	//
@@ -707,6 +705,14 @@ int member_exec( struct ast_channel* chan, void* data )
 		return res ;
 	}
 
+	// add member to channel table
+	member->bucket = &(channel_table[hash(member->chan->name) % CHANNEL_TABLE_SIZE]);
+
+	AST_LIST_LOCK (member->bucket ) ;
+	AST_LIST_INSERT_HEAD (member->bucket, member, hash_entry) ;
+	AST_LIST_UNLOCK (member->bucket ) ;
+
+	//ast_log( AST_CONF_DEBUG, "Added %s to the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
 
 	manager_event(
 		EVENT_FLAG_CALL,
@@ -816,7 +822,7 @@ int member_exec( struct ast_channel* chan, void* data )
 
 		}
 
-		if ((kick_flag = (conf->kick_flag || member->kick_flag))) {
+		if (conf->kick_flag || member->kick_flag) {
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "KICKED" );
 			break;
 		}
@@ -1484,9 +1490,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// finish up
 	//
 
-	//ast_log( AST_CONF_DEBUG, "created member, type => %s, priority => %d, readformat => %d\n",
-		//member->type, member->priority, chan->readformat ) ;
-	ast_log( LOG_NOTICE, "created member, type => %s, priority => %d, readformat => %d\n",
+	ast_log( AST_CONF_DEBUG, "created member, type => %s, priority => %d, readformat => %d\n",
 		member->type, member->priority, chan->readformat ) ;
 
 	return member ;

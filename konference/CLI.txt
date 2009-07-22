@@ -65,6 +65,9 @@ Current command line used by app_konference:
 - konference stop moh: stop music on hold for a conference member
   usage: conference start moh <channel>
 
+- konference version: display konference version
+  usage: conference version
+  
 - konference restart: kick all users in all conferences
   usage: conference restart
   
