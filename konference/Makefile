@@ -30,6 +30,9 @@ APP_KONFERENCE_DEBUG ?= 0
 # channel table size default
 CHANNEL_TABLE_SIZE ?= 997
 
+# schedule conference threads fifo ( 0 == OFF, 1 == ON )
+REALTIME ?= 1
+
 # turn app_konference texting on of off ( 0 == OFF, 1 == ON )
 TEXT ?= 0
 
@@ -85,6 +88,10 @@ CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
 
 ifeq ($(APP_KONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_KONFERENCE_DEBUG
+endif
+
+ifeq ($(REALTIME), 1)
+CPPFLAGS += -DREALTIME
 endif
 
 ifeq ($(TEXT), 1)
