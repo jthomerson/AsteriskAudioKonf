@@ -701,14 +701,14 @@ int member_exec( struct ast_channel* chan, void* data )
 	// setup a conference for the new member
 	//
 
-	char* max_users_flag = 0 ;
-	conf = join_conference( member, max_users_flag ) ;
+	char max_users_flag = 0 ;
+	conf = join_conference( member, &max_users_flag ) ;
 
 	if ( conf == NULL )
 	{
-		ast_log( LOG_ERROR, "unable to setup member conference\n" ) ;
+		ast_log( LOG_NOTICE, "unable to setup member conference %s: max_users_flag is %d\n", member->conf_name, max_users_flag ) ;
 		delete_member( member) ;
-		return (*max_users_flag ? 0 : -1 ) ;
+		return (max_users_flag ? 0 : -1 ) ;
 	}
 
 	//

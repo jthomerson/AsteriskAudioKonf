@@ -74,3 +74,28 @@ The effect is faster video switching.
 exten => 6969,1,Konference(testconf,XNt)
 
 Same as the first example, but video switching is now controlled by clients via DTMF
+
+4. Channel spying/whispering
+
+To use the spy parameter in the dial plan assume sip/5060-3985 is who you're
+interested in spying on and whispering to and say the conference started like
+this:
+
+konference(testconf,Rca)
+
+You would enter the conference: konference(testconf,Rca,spy=sip/5060-3985).
+
+When you join the conference, you will only hear the audio from sip/5060-3985
+and since you didn't start the conference muted, you will be able to talk
+directly to sip/5060-3985.
+
+On the other hand, if you entered the conference like this:
+
+konference(testconf,RcaL,spy=sip/5060-3985)
+
+You would join the conference muted (unable to talk directly to
+sip/5060-3985) and you would hear the audio only from that channel.
+
+Finally, you can toggle whispering on/off at any time using the command
+line interface to mute or unmute the spyer channel.
+

@@ -594,7 +594,6 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 		if (!member->max_users || (member->max_users > conf->membercount)) {
 			add_member( member, conf ) ;
 		} else {
-			ast_log( LOG_NOTICE, "conference %s max users exceeded: member count = %d\n", conf->name, conf->membercount ) ;
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "MAXUSERS");
 			*max_users_flag = 1;
 			conf = NULL;
