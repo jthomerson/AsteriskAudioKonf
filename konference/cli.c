@@ -1105,8 +1105,10 @@ char *conference_end(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a) {
 	// conference name
 	const char* name = argv[2] ;
 
+	int hangup = (argc == 4 && !strcmp(argv[3], "nohangup") ? 0 : 1) ;
+
 	// get the conference
-	if ( end_conference( name, 1 ) != 0 )
+	if ( end_conference( name, hangup ) != 0 )
 	{
 		ast_cli( fd, "unable to end the conference, name => %s\n", name ) ;
 		return SHOWUSAGE ;

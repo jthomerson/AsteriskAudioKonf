@@ -105,3 +105,6 @@ consistent with other asterisk applications.
 
 Added "H" option which enables "music on hold" if there is only one member in
 the conference.
+
+Added an optional parameter, nohangup, to the conference end command so that
+dial plan isn't terminated when the conference ends.
