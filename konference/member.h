@@ -102,6 +102,9 @@ struct ast_conf_member
 	// hold option flag
 	char hold_flag;
 
+	// wait option flag
+	char wait_for_moderator_flag;
+
 	// this member will not hear/see
 	int norecv_audio;
 #ifdef	VIDEO
