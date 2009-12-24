@@ -102,6 +102,9 @@ struct ast_conf_member
 	// hold option flag
 	char hold_flag;
 
+	// temp flag for when star is pressed
+	char star_pressed;
+
 	// this member will not hear/see
 	int norecv_audio;
 #ifdef	VIDEO
@@ -191,6 +194,8 @@ struct ast_conf_member
 #endif
 	// relay dtmf to manager?
 	short dtmf_relay;
+	// allow "star" dtmf menu?
+	short dtmf_star_menu;
 	// initial nat delay flag
 	short first_frame_received;
 #ifdef	TEXT

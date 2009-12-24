@@ -87,6 +87,66 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			ast_mutex_unlock( &member->lock ) ;
 		}
 #endif
+
+		if (member->dtmf_star_menu)
+		{
+			ast_mutex_lock( &member->lock ) ;
+			if (f->subclass == '*')
+			{
+				member->star_pressed = 1;
+				ast_log( AST_CONF_DEBUG, "star was pressed\n" );
+			}
+			else
+			{
+				// reset this immediately so that functions that allow repeat presses (4, 6, etc) can reset it to star_pressed = 1
+				short menu = member->star_pressed;
+				member->star_pressed = 0;
+				if (menu)
+				{
+					switch (f->subclass) {
+					case '1' :
+						if (member->mute_audio == 0)
+						{
+							ast_log( AST_CONF_DEBUG, "muting member\n" );
+							member->mute_audio = 1;
+						}
+						else if (member->mute_audio == 1)
+						{
+							ast_log( AST_CONF_DEBUG, "unmuting member\n" );
+							member->mute_audio = 0;
+						}
+						break;
+					case '2' :
+						ast_log( AST_CONF_DEBUG, "not implemented: lock/unlock conference\n" );
+						break;
+					case '3' :
+						ast_log( AST_CONF_DEBUG, "not implemented: eject last user that joined conference\n" );
+						break;
+					case '4' :
+						ast_log( AST_CONF_DEBUG, "not implemented: lower volume\n" );
+						break;
+					case '6' :
+						ast_log( AST_CONF_DEBUG, "not implemented: raise volume\n" );
+						break;
+					case '8' :
+						// this is a no-op - allows star_pressed to be reset to zero to stop volume adjustment
+						break;
+					case '7' :
+						member->listen_volume--;
+						member->star_pressed = 1;
+						ast_log( AST_CONF_DEBUG, "lower my volume (now: %d)\n", member->listen_volume );
+						break;
+					case '9' :
+						member->listen_volume++;
+						member->star_pressed = 1;
+						ast_log( AST_CONF_DEBUG, "raise my volume (now: %d)\n", member->listen_volume );
+						break;
+					}
+				}
+			}
+			ast_mutex_unlock( &member->lock ) ;
+		}
+
 		if (member->dtmf_relay)
 		{
 			// output to manager...
@@ -1161,6 +1221,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->dtmf_switch = 0; // no dtmf switch by default
 #endif
 	member->dtmf_relay = 0; // no dtmf relay by default
+	member->dtmf_star_menu = 0; // no dtmf star menu by default
 
 	// start of day video ids
 #ifdef	VIDEO
@@ -1272,6 +1333,8 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// moh if only member flag
 	member->hold_flag = 0 ;
 	
+	member->star_pressed = 0;
+
 	// temp pointer to flags string
 	char* flags = member->flags ;
 
@@ -1335,6 +1398,9 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #endif
 			case 'R':
 				member->dtmf_relay = 1;
+				break;
+			case 's':
+				member->dtmf_star_menu = 1;
 				break;
 #ifdef	VIDEO
 			case 'S':
