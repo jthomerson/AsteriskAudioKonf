@@ -22,6 +22,7 @@ Speex preprocessing options (right now app_konference does preprocessing only fo
 'T' : member connects through Zaptel, so speex preprocessing should be enabled
 
 DTMF options:
+'s' : allows DTMF functions like muting, etc (same as MeetMe menu: *1 = mute/unmute, etc)
 'X' : enable DTMF switch: video can be switched by users using DTMF. Do not use with 'S'.
 'R' : enable DTMF relay: DTMF tones generate a manager event
 If neither 'X' nor 'R' are present, DTMF tones will be forwarded to all members in the conference
