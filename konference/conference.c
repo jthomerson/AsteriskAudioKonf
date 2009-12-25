@@ -928,11 +928,16 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 		{
 			// moderator joining - stop music on hold
 			ast_log( LOG_NOTICE, "moderator joining - stop music on hold\n" );
-			ast_mutex_lock( &conf->memberlist->lock ) ;
-			conf->memberlist->moh_flag = 0 ;
-			conf->memberlist->ready_for_outgoing = 1;
-			ast_moh_stop(conf->memberlist->chan);
-			ast_mutex_unlock( &conf->memberlist->lock ) ;
+			struct ast_conf_member *currmember;
+			for ( currmember = conf->memberlist ; currmember != NULL ; currmember = currmember->next )
+			{
+				ast_log( LOG_NOTICE, "stop MOH for channel: %s", currmember->chan->name );
+				ast_mutex_lock( &currmember->lock ) ;
+				currmember->moh_flag = 0 ;
+				currmember->ready_for_outgoing = 1;
+				ast_moh_stop(currmember->chan);
+				ast_mutex_unlock( &currmember->lock ) ;
+			}
 		}
 	}
 
