@@ -913,6 +913,28 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	// update conference stats
 	conf->membercount++;
 
+	if ( member->wait_for_moderator_flag == 1 )
+	{
+		if ( !member->ismoderator && conf->stats.moderators == 0 )
+		{
+			// no moderator in the conference yet - start music on hold
+			ast_log( LOG_NOTICE, "no moderator in the conference yet - start music on hold\n" ) ;
+			ast_mutex_lock( &member->lock ) ;
+			member->moh_flag = 1 ;
+			ast_mutex_unlock( &member->lock ) ;
+		}
+		else if ( member->ismoderator && conf->membercount > 1 )
+		{
+			// moderator joining - stop music on hold
+			ast_log( LOG_NOTICE, "moderator joining - stop music on hold\n" );
+			ast_mutex_lock( &conf->memberlist->lock ) ;
+			conf->memberlist->moh_flag = 0 ;
+			conf->memberlist->ready_for_outgoing = 1;
+			ast_moh_stop(conf->memberlist->chan);
+			ast_mutex_unlock( &conf->memberlist->lock ) ;
+		}
+	}
+
 	if ( member->hold_flag == 1 )
 	{
 		if  ( conf->membercount == 1 )

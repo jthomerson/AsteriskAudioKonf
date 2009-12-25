@@ -1271,6 +1271,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// moh if only member flag
 	member->hold_flag = 0 ;
+	member->wait_for_moderator_flag = 0 ;
 	
 	// temp pointer to flags string
 	char* flags = member->flags ;
@@ -1378,6 +1379,10 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 			case 'H':
 				member->hold_flag = 1;
+				break;
+
+			case 'w':
+				member->wait_for_moderator_flag = 1;
 				break;
 
 			default:
