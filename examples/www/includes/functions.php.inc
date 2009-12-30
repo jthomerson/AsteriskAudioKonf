@@ -173,7 +173,7 @@ function kickUser($conference,$channel) {
 	$fp = managerConnect();
         $conference = trim($conference);
        	fputs($fp,"Action: Command\r\n");
-        fputs($fp,"Command: konference kickchannel $conference $channel\r\n\r\n");
+        fputs($fp,"Command: konference kickchannel $channel\r\n\r\n");
        	fputs($fp,"action: logoff\r\n");
         fputs($fp,"\r\n");
 }
@@ -290,7 +290,7 @@ function recordConference($db,$conference) {
 		}
 		if ($channel != "") {
 	        	fputs($fp,"Action: Command\r\n");
-	        	fputs($fp,"Command: konference kickchannel $conference $channel\r\n\r\n");
+	        	fputs($fp,"Command: konference kickchannel $channel\r\n\r\n");
         		fputs($fp,"action: logoff\r\n");
 		        fputs($fp,"\r\n");
 		} else {
