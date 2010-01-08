@@ -107,10 +107,10 @@ The general syntax of KonferenceCount application is:
 
 	To play the conference count to the channel:
 
-	exten => 6969,1,KonferenCount(textconf)
+	exten => 6969,1,KonferenceCount(textconf)
 
 	To put the conference count in a channel variable:
 
-	exten => 6969,1,KonferenCount(textconf,testvar)
+	exten => 6969,1,KonferenceCount(textconf,testvar)
 
 
