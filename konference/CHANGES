@@ -108,3 +108,8 @@ the conference.
 
 Added an optional parameter, nohangup, to the conference end command so that
 dial plan isn't terminated when the conference ends.
+
+Added a directory to examples for munin plugins to graph conference and member
+counts. 
+
+Documented KonferenceCount application in Dialplan.txt.
