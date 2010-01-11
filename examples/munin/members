@@ -1,0 +1,17 @@
+#!/bin/sh
+
+case $1 in
+	config)
+		cat <<'EOM'
+graph_title members 
+graph_vlabel members
+graph_category appkonference
+graph_info A data point is the sum of all conference members over all conferences at the sample time..
+members.label members
+members.warning 1000
+EOM
+	exit 0;;
+esac
+
+cat /tmp/konferences | sed 1d | (sum=0; while read -ers conf count vol; do sum=$(($sum+$count)); done; echo  "members.value $sum")
+

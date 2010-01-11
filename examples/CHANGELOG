@@ -1,0 +1,5 @@
+2009-12-30 John Hass <john@sipmeeting.com>
+	Added CHANGELOG :)
+	Added Conference Join Sounds to the listener. (listener internal flag of nothing q to supress)
+	Added Conference Announce to the listener. (listener internal flag of i)
+	Added extensions.conf to asterisk/ in the examples directory (complete rewrite of the asterikast one)

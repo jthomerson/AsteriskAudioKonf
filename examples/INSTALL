@@ -6,7 +6,7 @@ Written By:
 Building Instructions:
 Required Packages:
 	Asterisk 1.4 series
-	Custom appconference
+	Custom appkonference
 	Database Engine (SQLite 3 or MySQL)
 	Perl
 	Perl Modules:
@@ -112,11 +112,11 @@ Slackware 12.2
 	reload asterisk
 	asterisk -rx "module reload"
 	****Last Step****
-	Install the binary of app_conference.so
-		install ~/asterikast-conference-manager-1.0/modules/app_conference.so /usr/lib/asterisk/modules/app_conference.so
+	Install the binary of app_konference.so
+		install ~/asterikast-conference-manager-1.0/modules/app_konference.so /usr/lib/asterisk/modules/app_konference.so
 	load asterisk cli
 		asterisk -r
-			module load app_conference.so
+			module load app_konference.so
 					
 		
 		
@@ -210,11 +210,11 @@ Ubuntu Server 8.10
 	reload asterisk
 	asterisk -rx "module reload"
 	****Last Step****
-	Install the binary of app_conference.so
-		install ~/asterikast-conference-manager-1.0/modules/app_conference.so /usr/lib/asterisk/modules/app_conference.so
+	Install the binary of app_konference.so
+		install ~/asterikast-conference-manager-1.0/modules/app_konference.so /usr/lib/asterisk/modules/app_konference.so
 	load asterisk cli
 		asterisk -r
-			module load app_conference.so
+			module load app_konference.so
 
 	That's it you should be able to browse to:
 		http://server/index.php

@@ -11,7 +11,7 @@ use Time::Local;
 use Math::Round qw(:all);
 use File::Touch;
 
-#$|=1; #uncomment to print in realtime to the log (not recommended in production)
+$|=1; #uncomment to print in realtime to the log (not recommended in production)
 
 my $host = "127.0.0.1";
 my $port = 5038;
@@ -37,7 +37,7 @@ my $recording_group = "apache";
 my $recording_location = "/var/recordings";
 
 
-forkproc(); #Uncomment if you want to fork to the background (recommended for production)
+#forkproc(); #Uncomment if you want to fork to the background (recommended for production)
 
 
 ###############################Application do not edit below this line#########################################
@@ -93,7 +93,6 @@ while (<$remote>) {
                         @event = split(/\;/, $finalline);
                         @fullevent = ();
                         $t = getTime();
-                        #print $t . " ";
                         foreach(@event) {
 				@l = split(/\: /,$_);
        	                        push(@fullevent,$l[0]);
@@ -111,11 +110,14 @@ while (<$remote>) {
                         $number = $hash{"CallerID"};
                         $name = $hash{"CallerIDName"};
                         $state = $hash{"State"};
+			$uid = $hash{"UniqueID"};
+			#remove the . from the uid, messes up playback
+			$uid =~ s/\.//g; #Unique Enough
                         #print STDERR "$t\n" . Data::Dumper->Dump([\%hash], ['*hash']); #For extra debugging Lots of Info
                         switch ($event) {
-                                case "ConferenceJoin" { ConferenceJoin($conference,$channel,$flags,$count,$member,$number,$name); }
+                                case "ConferenceJoin" { ConferenceJoin($conference,$channel,$flags,$count,$member,$number,$name,$uid); }
                                 case "ConferenceDTMF" { ConferenceDTMF($conference,$channel,$flags,$count,$key,$muted); }
-                                case "ConferenceLeave" { ConferenceLeave($conference,$channel,$flags,$member,$count); }
+                                case "ConferenceLeave" { ConferenceLeave($conference,$channel,$flags,$member,$count,$uid); }
                                 case "ConferenceState" { ConferenceState($conference,$channel,$flags,$state); }
                                 case "ConferenceUnmute" { ConferenceUnmute($conference) }
                                 case "ConferenceMute" { ConferenceMute($conference) }
@@ -169,7 +171,7 @@ sub ConferenceDTMF {
 					$rec_found = $row[0];
 			        }
 				if ($rec_found ne "") {
-					command("Action: Command${EOL}Command: konference kickchannel $conference $rec_found${BLANK}");			
+					command("Action: Command${EOL}Command: konference kickchannel $rec_found${BLANK}");			
 				} else {
 					mkdir($recording_location,022);
 					chown($recording_uid, $recording_gid, $recording_location);
@@ -179,7 +181,7 @@ sub ConferenceDTMF {
 		}
 	}
 	if ($key == 0) {
-		command("Action: Command${EOL}Command: konference kickchannel $conference $channel${BLANK}");
+		command("Action: Command${EOL}Command: konference kickchannel $channel${BLANK}");
 	}
 	if ($key == 5) {
 		if ($flags =~ /M/) {
@@ -249,15 +251,50 @@ sub ConferenceState {
 }
 
 sub ConferenceLeave {
-        $conference = shift;
-        $channel = shift;
-        $flags = shift;
-        $count = shift;
-        $member = shift;
+	$conference=shift;
+	$channel=shift;
+	$flags=shift;
+	$member=shift;
 	$count = shift;
-
+	$uniqueid = shift;
 	if (defined($dbh)) {
 		$dbh->do("DELETE FROM online where member_id='$member'");
+		#this is for announcing, we still need to add something to the asterisk dialplan, I like the announce before the beep if they
+		#are both enabled
+		if ($flags =~ /i/) {
+			$sql = "SELECT channel from online where conference='$conference'";
+			my $sth = $dbh->prepare($sql);
+			$sth->execute;
+			while (@row = $sth->fetchrow_array) {
+				$tchannel = $row[0];
+				command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasleft${BLANK}");
+			}
+			unlink("/tmp/$conference/$uniqueid.wav");
+		}
+		if ($flags =~ /q/) {
+		} else {
+			#play the enter tone
+			$sql = "SELECT channel from online where conference='$conference'";
+                        my $sth = $dbh->prepare($sql);
+                        $sth->execute;
+			while (@row = $sth->fetchrow_array) {
+				$tchannel = $row[0];
+				command("Action: Command${EOL}Command: konference play sound $tchannel beep mute${BLANK}");
+                        }
+			
+		}
+		if ($count == 1) {
+			#see if the recorder is left over
+			$sql = "SELECT channel from online where conference='$conference' and number='900'";
+			my $sth = $dbh->prepare($sql);
+                        $sth->execute;
+			$rchannel = "";
+                        while (@row = $sth->fetchrow_array) {
+                                $rchannel = $row[0];
+				command("Action: Command${EOL}Command: konference kickchannel $rchannel${BLANK}");
+                        }
+			
+		}
 	} else {
 		print "No DBH";
 	}
@@ -271,8 +308,32 @@ sub ConferenceJoin {
 	$member = shift;
 	$number = shift;
 	$name = shift;
+	$uniqueid = shift;
 	if (defined($dbh)) {
 		$dbh->do("INSERT INTO online (member_id,conference,channel,number,name) values ('$member','$conference','$channel','$number','$name')");
+		#this is for announcing, we still need to add something to the asterisk dialplan, I like the announce before the beep if they
+		#are both enabled
+		if ($flags =~ /i/) {
+			$sql = "SELECT channel from online where conference='$conference'";
+			my $sth = $dbh->prepare($sql);
+			$sth->execute;
+			while (@row = $sth->fetchrow_array) {
+				$tchannel = $row[0];
+				command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasentered${BLANK}");
+			}
+		}
+		if ($flags =~ /q/) {
+		} else {
+			#play the enter tone
+			$sql = "SELECT channel from online where conference='$conference'";
+                        my $sth = $dbh->prepare($sql);
+                        $sth->execute;
+			while (@row = $sth->fetchrow_array) {
+				$tchannel = $row[0];
+				command("Action: Command${EOL}Command: konference play sound $tchannel beep mute${BLANK}");
+                        }
+			
+		}
 	} else {
 		print "DBH not defined\n";
 	}
@@ -346,11 +407,11 @@ sub start_recording {
 	chown($recording_uid, $recording_gid, $RECORDINGFILE . ".wav");
 	$cmd = "Action: Command${EOL}Command: konference stop sounds $channel${BLANK}";
 	$cmd .= "Action: Originate${EOL}";
-	$cmd .= "Channel: Local/recorder\@conference${EOL}";
+	$cmd .= "Channel: Local/recorder\@konference${EOL}";
 	$cmd .= "MaxRetries: 0${EOL}";
 	$cmd .= "RetryTime: 15${EOL}";
 	$cmd .= "WaitTime: 15${EOL}";
-	$cmd .= "Context: conference${EOL}";
+	$cmd .= "Context: konference${EOL}";
 	$cmd .= "Exten: enterconf${EOL}";
 	$cmd .= "Priority: 1${EOL}";
 	$cmd .= "Callerid: Recorder <900>${EOL}";
