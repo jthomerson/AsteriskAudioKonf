@@ -1356,9 +1356,9 @@ int show_conference_list ( int fd, const char *name )
 
 			// ast_cli(fd, "Chat mode is %s\n", conf->chat_mode_on ? "ON" : "OFF");
 #ifdef	VIDEO
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Bucket", "Spy", "Channel");
+			//ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
 #else
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Bucket", "Spy", "Channel");
+			//ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
 #endif
 			// do the biz
 			member = conf->memberlist ;
@@ -1372,15 +1372,15 @@ int show_conference_list ( int fd, const char *name )
 #ifdef	VIDEO
 				if ( member->driven_member == NULL )
 				{
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", member->bucket - channel_table, spy_str, member->channel_name);
+					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Channel: %-80s\n",
+					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, member->channel_name);
 				} else {
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d  %-20ld %-20.20s %-80s\n", member->id, member->flags,
-					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->bucket - channel_table, spy_str, member->channel_name);
+					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Speaking: %s Channel: %-80s\n",
+					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, (( member->speaking_state == 1 ) ? "True" : "False"), member->channel_name);
 				}
 #else
-				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->bucket - channel_table, spy_str, member->channel_name);
+					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Speaking: %s Channel: %-80s\n",
+					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, (( member->speaking_state == 1 ) ? "True" : "False"), member->channel_name);
 #endif
 				member = member->next;
 			}
@@ -1632,7 +1632,11 @@ int mute_member (  const char* confname, int user_id)
 					manager_event(
 						EVENT_FLAG_CALL,
 						"ConferenceMemberMute",
+						"ConferenceName: %s\r\n"
+						"MemberId: %d\r\n"
 						"Channel: %s\r\n",
+                				member->conf_name,
+                				member->id,
 						member->channel_name
 					) ;
 				      res = 1;
@@ -1743,7 +1747,11 @@ int unmute_member (  const char* confname, int user_id)
 					manager_event(
 						EVENT_FLAG_CALL,
 						"ConferenceMemberUnmute",
+						"ConferenceName: %s\r\n"
+						"MemberId: %d\r\n"
 						"Channel: %s\r\n",
+						member->conf_name,
+						member->id,
 						member->channel_name
 					) ;
 				      res = 1;

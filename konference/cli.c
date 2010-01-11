@@ -541,7 +541,11 @@ char *conference_mutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 	manager_event(
 		EVENT_FLAG_CALL,
 		"ConferenceMemberMute",
+		"ConferenceName: %s\r\n"
+		"MemberId: %d\r\n",
 		"Channel: %s\r\n",
+		member->conf_name,		
+		member->id,
 		channel
 	) ;
 
@@ -754,7 +758,11 @@ char *conference_unmutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_
 	manager_event(
 		EVENT_FLAG_CALL,
 		"ConferenceMemberUnmute",
+		"ConferenceName: %s\r\n"
+		"MemberId: %d\r\n",
 		"Channel: %s\r\n",
+		member->conf_name,
+		member->id,
 		channel
 	) ;
 
