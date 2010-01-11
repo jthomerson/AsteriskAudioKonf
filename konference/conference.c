@@ -2946,7 +2946,7 @@ int play_sound_channel(int fd, const char *channel, char **file, int mute, int n
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (!member->moh_flag)
+	} else if (!member->norecv_audio && !member->moh_flag)
 	{
 
 		while ( n-- > 0 ) {
