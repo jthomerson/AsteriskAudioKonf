@@ -1,0 +1,30 @@
+Munin is great application for monitoring the status of your server!
+http://munin.projects.linpro.no/
+
+We have created two modules for tracking your app_konference application
+
+
+conferences - this gives you the total number of conferences at any given time
+
+members - this gives you the total number of members in all conferences at any given time
+
+INSTALL
+to install these modules copy them to (on gentoo) /etc/munin/plugins
+
+You must then run the plugins as the same user as you run asterisk.
+This is required since "asterisk -rx" is required.  to do this (On Gentoo)
+
+/etc/munin/plugin-conf.d/munin-node
+
+add the following lines (Change root to the username asterisk is running under if required)
+
+[conferences]
+user root
+
+[members]
+user root
+
+
+That's it munin will now start logging your app_konference application
+
+Graph example: http://sourceforge.net/dbimage.php?id=246214

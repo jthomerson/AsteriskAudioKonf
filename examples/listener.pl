@@ -269,7 +269,6 @@ sub ConferenceLeave {
 				$tchannel = $row[0];
 				command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasleft${BLANK}");
 			}
-			unlink("/tmp/$conference/$uniqueid.wav");
 		}
 		if ($flags =~ /q/) {
 		} else {
@@ -294,6 +293,10 @@ sub ConferenceLeave {
 				command("Action: Command${EOL}Command: konference kickchannel $rchannel${BLANK}");
                         }
 			
+		}
+		if ($count == 0) {
+			$dir = "/tmp/$conference";
+			system('rm','-rf', $dir);
 		}
 	} else {
 		print "No DBH";
