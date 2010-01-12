@@ -1356,9 +1356,9 @@ int show_conference_list ( int fd, const char *name )
 
 			// ast_cli(fd, "Chat mode is %s\n", conf->chat_mode_on ? "ON" : "OFF");
 #ifdef	VIDEO
-			//ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
 #else
-			//ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s\n", "User #", "CallerIDName", "CallerID", "Audio", "UniqueID", "Conference Name", "Channel");
 #endif
 			// do the biz
 			member = conf->memberlist ;
