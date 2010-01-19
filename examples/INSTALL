@@ -86,17 +86,17 @@ Slackware 12.2
 			Include /etc/httpd/mod_php.conf
 		chmod +x /etc/rc.d/rc.httpd
                 /etc/rc.d/rc.httpd start
-	cp -r ~/asterikast-conference-manager-1.0/www/* /var/www/htdocs/ (assuming you uncompressed in your home directory)
+	cp -r ~/appkonference/examples/www/* /var/www/htdocs/ (assuming you uncompressed in your home directory)
 	chown -R www-data:www-data /var/www/*
-	cp ~/asterikast-conference-manager-1.0/src/asterikast.pl /usr/bin/
-	edit the /usr/bin/asterikast.pl
+	cp ~/appkonference/examples/listener.pl /usr/bin/
+	edit the /usr/bin/listener.pl
 	if your using sqlite: (ensure permissions)
 		my $owner = "apache";
 		my $group = "apache";
 	start asterisk
 		safe_asterisk
 	load the manager.conf changes. if this is a new install:
-		cp ~/asterikast-conference-manager-1.0/asterisk/manager.conf /etc/asterisk/manager.conf	
+		cp ~/appkonference/examples/asterisk/manager.conf /etc/asterisk/manager.conf	
 	reload asterisk
 		asterisk -rx "module reload"	
 	start the listener
@@ -106,14 +106,14 @@ Slackware 12.2
 		  Username         IP Address     
 		  asterikast       127.0.0.1    
 	this means the listener is listening
-	if this is a new install copy the extensions.conf and asterikast.conf
-	cp ~/asterikast-conference-manager-1.0/asterisk/extensions.conf /etc/asterisk/
-	cp ~/asterikast-conference-manager-1.0/asterisk/asterikast.conf /etc/asterisk/
+	cp ~/appkonference/examples/asterisk/extensions.conf /etc/asterisk/
 	reload asterisk
 	asterisk -rx "module reload"
 	****Last Step****
-	Install the binary of app_konference.so
-		install ~/asterikast-conference-manager-1.0/modules/app_konference.so /usr/lib/asterisk/modules/app_konference.so
+	Build app_konference
+		cd ~/appkonference/konference
+		make
+		make install
 	load asterisk cli
 		asterisk -r
 			module load app_konference.so
@@ -181,10 +181,10 @@ Ubuntu Server 8.10
 		/etc/init.d/apache2/restart
 	
 	****Almost Done****
-	cp -r ~/asterikast-conference-manager-1.0/www/* /var/www/ (assuming you uncompressed in your home directory)
+	cp -r ~/appkonference/examples/* /var/www/ (assuming you uncompressed in your home directory)
 	chown -R www-data:www-data /var/www/*
-	cp ~/asterikast-conference-manager-1.0/src/asterikast.pl /usr/bin/
-	edit the /usr/bin/asterikast.pl
+	cp ~/appkonference/examples/listener.pl /usr/bin/
+	edit the /usr/bin/listener.pl
 	if your using sqlite: (ensure permissions)
 		my $owner = "www-data";
 		my $group = "www-data";
@@ -194,7 +194,7 @@ Ubuntu Server 8.10
 	start asterisk
 		safe_asterisk
 	load the manager.conf changes. if this is a new install:
-		cp ~/asterikast-conference-manager-1.0/asterisk/manager.conf /etc/asterisk/manager.conf	
+		cp ~/appkonference/examples/asterisk/manager.conf /etc/asterisk/manager.conf	
 	reload asterisk
 		asterisk -rx "module reload"	
 	start the listener
@@ -204,14 +204,14 @@ Ubuntu Server 8.10
 		  Username         IP Address     
 		  asterikast       127.0.0.1    
 	this means the listener is listening
-	if this is a new install copy the extensions.conf and asterikast.conf
-	cp ~/asterikast-conference-manager-1.0/asterisk/extensions.conf /etc/asterisk/
-	cp ~/asterikast-conference-manager-1.0/asterisk/asterikast.conf /etc/asterisk/
+	cp ~/appkonference/examples/asterisk/extensions.conf /etc/asterisk/
 	reload asterisk
 	asterisk -rx "module reload"
 	****Last Step****
-	Install the binary of app_konference.so
-		install ~/asterikast-conference-manager-1.0/modules/app_konference.so /usr/lib/asterisk/modules/app_konference.so
+	Build appkonference
+		cd ~/appkonference/konference
+		make
+		make install
 	load asterisk cli
 		asterisk -r
 			module load app_konference.so
