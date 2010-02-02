@@ -930,7 +930,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 			struct ast_conf_member *currmember;
 			for ( currmember = conf->memberlist ; currmember != NULL ; currmember = currmember->next )
 			{
-				ast_log( LOG_NOTICE, "stop MOH for channel: %s", currmember->chan->name );
+				ast_log( LOG_NOTICE, "stop MOH for channel: %s\n", currmember->chan->name );
 				ast_mutex_lock( &currmember->lock ) ;
 				currmember->moh_flag = 0 ;
 				currmember->ready_for_outgoing = 1;
@@ -1160,6 +1160,20 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 
 			// update moderator count
 			moderators = (!member->ismoderator ? conf->stats.moderators : --conf->stats.moderators );
+
+			if ( member->ismoderator && member->wait_for_moderator_flag == 1 && moderators == 0 && membercount > 0 )
+			{
+				ast_log( LOG_NOTICE, "Moderator left - playing MOH until he returns\n");
+				struct ast_conf_member *currmember;
+				for ( currmember = conf->memberlist ; currmember != NULL ; currmember = currmember->next )
+				{
+					ast_log( LOG_NOTICE, "start MOH for channel: %s\n", currmember->chan->name );
+					ast_mutex_lock( &currmember->lock ) ;
+					currmember->moh_flag = 1;
+					currmember->ready_for_outgoing = 1;
+					ast_mutex_unlock( &currmember->lock ) ;
+				}
+			}
 #ifdef	VIDEO
 			// Check if member is the default or current video source
 			if ( conf->current_video_source_id == member->id )
