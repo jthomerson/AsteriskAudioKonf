@@ -113,3 +113,7 @@ Added a directory to examples for munin plugins to graph conference and member
 counts. 
 
 Documented KonferenceCount application in Dialplan.txt.
+
+Fix the play sound command so that it plays the input sound in the language
+specified via the channel function or the default language if the langauge is
+not set.

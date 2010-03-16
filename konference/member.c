@@ -366,7 +366,7 @@ again:
 
 	if (!toboot->stopped && !toboot->stream)
 	{
-		toboot->stream = ast_openstream(member->chan, toboot->name, NULL);
+		toboot->stream = ast_openstream(member->chan, toboot->name, member->chan->language);
 		//ast_log( LOG_WARNING, "trying to play sound: name = %s, stream = %p\n", toboot->name, toboot->stream);
 		if (toboot->stream)
 		{
