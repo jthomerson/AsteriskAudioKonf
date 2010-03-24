@@ -11,45 +11,29 @@ use Time::Local;
 use Math::Round qw(:all);
 use File::Touch;
 
-$|=1; #uncomment to print in realtime to the log (not recommended in production)
+#$|=1; #uncomment to print in realtime to the log (not recommended in production)
 
 my $host = "127.0.0.1";
 my $port = 5038;
-my $user = "asterikast";
-my $secret = "asterikast";
+my $user = "";
+my $secret = "";
 my $EOL = "\015\012";
 my $BLANK = $EOL x 2;
 my $mysql_auto_reconnect = 1;
-my $db_engine="sqlite"; #sqlite or mysql (mysql for high volume)
+my $db_engine="mysql"; #sqlite or mysql (mysql for high volume)
 my $dbh = "";
-#######SQLite Information###################
-my $owner = "apache";
-my $group = "apache";
-my $sqlitedb_location = "asterikast.db";
 #######Mysql Information####################
-my $mysql_username = "asterikast";
-my $mysql_password = "asterikast";
-my $mysql_db = "asterikast";
+my $mysql_username = "asteriskuser";
+my $mysql_password = "";
+my $mysql_db = "conference";
 my $mysql_host = "localhost";
 #######Recording Information################
-my $recording_owner = "apache";
-my $recording_group = "apache";
-my $recording_location = "/var/recordings";
 
-
-#forkproc(); #Uncomment if you want to fork to the background (recommended for production)
+watchdog(); #Check to see if application is already running, if it is exit.
+forkproc(); #Uncomment if you want to fork to the background (recommended for production)
 
 
 ###############################Application do not edit below this line#########################################
-$recording_uid = getpwnam($recording_owner);
-$recording_gid = getgrnam($recording_group);
-
-$sqlite_uid = getpwnam($owner);
-$sqlite_gid = getgrnam($group);
-
-
-mkdir($recording_location,022);
-chown($recording_uid, $recording_gid, $recording_location);
 #handle a restart
 if ($ARGV[0] eq "restart") {
         open FILE, "/var/run/listener.pid" or die $!;
@@ -58,23 +42,14 @@ if ($ARGV[0] eq "restart") {
                 `kill -9 $_`
         }
         close(FILE);
-        unlink("/var/log/listener.pid");
+        unlink("/var/run/listener.pid");
 	print STDERR "$t Listener restarted\n";
 }
 
-
-if ($db_engine eq "sqlite") {
-	mkdir("/var/database",0777);
-	chown($sqlite_uid, $sqlite_gid, "/var/database");
-	unlink("/var/database/".$sqlitedb_location);
-	$dbh = DBI->connect("dbi:SQLite:dbname=/var/database/".$sqlitedb_location,"","");
-	chown($sqlite_uid, $sqlite_gid, "/var/database/" . $sqlitedb_location);
-	createSQLiteTable();
-} elsif ($db_engine eq "mysql") {
 	$dbh = DBI->connect( "dbi:mysql:$mysql_db;host=$mysql_host", $mysql_username, $mysql_password,{mysql_auto_reconnect => $mysql_auto_reconnect},);
-}
 
 reconnect:
+print STDERR "$t reconnect\n";
 my $remote = IO::Socket::INET->new(
     Proto => 'tcp',   # protocol
     PeerAddr=> $host, # Address of server
@@ -110,14 +85,17 @@ while (<$remote>) {
                         $number = $hash{"CallerID"};
                         $name = $hash{"CallerIDName"};
                         $state = $hash{"State"};
-			$uid = $hash{"UniqueID"};
+			$uniqueid = $hash{"UniqueID"};
+			my $fulluniqueid = $uniqueid;
+			$duration = $hash{"Duration"};
 			#remove the . from the uid, messes up playback
 			$uid =~ s/\.//g; #Unique Enough
-                        #print STDERR "$t\n" . Data::Dumper->Dump([\%hash], ['*hash']); #For extra debugging Lots of Info
+			$moderators = $hash{"Moderators"};
+                        print STDERR "$t\n" . Data::Dumper->Dump([\%hash], ['*hash']); #For extra debugging Lots of Info
                         switch ($event) {
-                                case "ConferenceJoin" { ConferenceJoin($conference,$channel,$flags,$count,$member,$number,$name,$uid); }
+                                case "ConferenceJoin" { ConferenceJoin($conference,$channel,$flags,$count,$member,$number,$name,$uid,$moderators); }
                                 case "ConferenceDTMF" { ConferenceDTMF($conference,$channel,$flags,$count,$key,$muted); }
-                                case "ConferenceLeave" { ConferenceLeave($conference,$channel,$flags,$member,$count,$uid); }
+                                case "ConferenceLeave" { ConferenceLeave($conference,$channel,$flags,$member,$count,$uid,$moderators,$duration,$fulluniqueid); }
                                 case "ConferenceState" { ConferenceState($conference,$channel,$flags,$state); }
                                 case "ConferenceUnmute" { ConferenceUnmute($conference) }
                                 case "ConferenceMute" { ConferenceMute($conference) }
@@ -145,25 +123,61 @@ sub ConferenceDTMF {
 	$key = shift;
 	$muted = shift;
 
+	$sql = "SELECT lastmenuoption from online where channel='$channel' LIMIT 1";
+	my $sth = $dbh->prepare($sql);
+        $sth->execute;
+	my $lastoption = $sth->fetchrow_array();
+	$sth->finish;
+	
 	if ($key eq "#") {
+		command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}");
 		playcount($count,$channel);
 	}
+	
+	if ($key eq "*") {
+		if (!$lastoption) {
+		command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-usermenu mute${BLANK}");
+	
+		$sql = "UPDATE online SET lastmenuoption='*' WHERE channel='$channel'";
+		my $sth = $dbh->prepare($sql);
+	        $sth->execute;
+	        }
+	}
+	
+	if ($key eq 0) {
 
-	if ($key == 1) {
-		if ($muted == 0) {
-			setMute($channel,1);
-			command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference mutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-muted mute${BLANK}");
-		}
-		if ($muted == 1) {
-			setMute($channel,0);
-			command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference unmutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-unmuted mute${BLANK}");
-		}
+	command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}");
+	}
 
-	}	
-	if ($key == 3) {
+	if ($key == 1 && $lastoption eq "*") {
+		if ($flags =~ /o/) {
+			### Listen only mode
+		} else {
+			if ($muted == 0) {
+				setMute($channel,1);
+				command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference mutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-muted mute${BLANK}");
+			}
+			if ($muted == 1) {
+				setMute($channel,0);
+				command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}Action: Command${EOL}Command: konference unmutechannel $channel${BLANK}Action: Command${EOL}Command: konference play sound $channel conf-unmuted mute${BLANK}");
+			}
+		}
+		
+		$sql = "UPDATE online SET lastmenuoption=NULL WHERE channel='$channel' LIMIT 1";
+		my $sth = $dbh->prepare($sql);
+	        $sth->execute;
+	        $sth->finish;
+
+	}
+	if ($key == 2) {
+	command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}");	
+
+	}
+	
+	if ($key == 3 && $lastoption eq "*") {
 		if ($flags =~ /M/) {
 			if (defined($dbh)) {
-				$sql = "SELECT channel from online where conference='$conference' and number='900'";
+				$sql = "SELECT channel from online where conference='$conference' and number='100'";
 			        my $sth = $dbh->prepare($sql);
 			        $sth->execute;
 				$rec_found = "";
@@ -171,34 +185,45 @@ sub ConferenceDTMF {
 					$rec_found = $row[0];
 			        }
 				if ($rec_found ne "") {
-					command("Action: Command${EOL}Command: konference kickchannel $rec_found${BLANK}");			
+					command("Action: Command${EOL}Command: konference kickchannel $rec_found${BLANK}");
+					command("Action: Command${EOL}Command: konference play sound $tchannel call recorded enabled mute${BLANK}");
 				} else {
 					mkdir($recording_location,022);
 					chown($recording_uid, $recording_gid, $recording_location);
 					start_recording($conference);
+					command("Action: Command${EOL}Command: konference play sound $tchannel call recorded disabled mute${BLANK}");
 				}
+				
+				$dbh->do("UPDATE online SET lastmenuoption=NULL WHERE channel='$channel' LIMIT 1");
 			}
 		}
 	}
-	if ($key == 0) {
-		command("Action: Command${EOL}Command: konference kickchannel $channel${BLANK}");
+	
+	if ($key == 4 && $lastoption eq "*") {
+	command("Action: Command${EOL}Command: konference listenvolume $channel down${BLANK}");
 	}
+	
 	if ($key == 5) {
 		if ($flags =~ /M/) {
+			## Mute all users, then unmute all moderators / or check this keeps moderators unmuted
 			command("Action: Command${EOL}Command: konference muteconference $conference${BLANK}");
 		}
 	}
-	if ($key == 4) {
-			command("Action: Command${EOL}Command: konference volume $conference down${BLANK}");
+
+	if ($key == 6 && $lastoption eq "*") {
+			command("Action: Command${EOL}Command: konference listenvolume $channel up${BLANK}");
 	}
-	if ($key == 6) {
-			command("Action: Command${EOL}Command: konference volume $conference up${BLANK}");
+	if ($key == 7 && $lastoption eq "*") {
+			command("Action: Command${EOL}Command: konference talkvolume $channel down${BLANK}");
 	}
-	if ($key == 7) {
-			command("Action: Command${EOL}Command: konference talkvolume $conference up${BLANK}");
+	if ($key == 8 && $lastoption eq "*") {
+		command("Action: Command${EOL}Command: konference stop sounds $channel${BLANK}");
+		$dbh->do("UPDATE online SET lastmenuoption=NULL WHERE channel='$channel' LIMIT 1");
+		
 	}
-	if ($key == 9) {
-			command("Action: Command${EOL}Command: konference talkvolume $conference down${BLANK}");
+	
+	if ($key == 9 && $lastoption eq "*") {
+			command("Action: Command${EOL}Command: konference talkvolume $channel up${BLANK}");
 	}
 
 	$key = "";	
@@ -240,9 +265,9 @@ sub ConferenceState {
 	$state = shift;
 	if (defined($dbh)) {
 		if ($state eq "speaking") {			
-			$dbh->do("UPDATE online set talking='1' where channel='$channel'");
+			$dbh->do("UPDATE online set talking='1' where channel='$channel' LIMIT 1");
 		} elsif ($state eq "silent") {
-			$dbh->do("UPDATE online set talking='0' where channel='$channel'");
+			$dbh->do("UPDATE online set talking='0' where channel='$channel' LIMIT 1");
 		}
 	} else {
 		print "No Database\n";
@@ -257,34 +282,74 @@ sub ConferenceLeave {
 	$member=shift;
 	$count = shift;
 	$uniqueid = shift;
+	$moderators = shift;
+	$duration = shift;
+	$fulluniqueid = shift;
 	if (defined($dbh)) {
-		$dbh->do("DELETE FROM online where member_id='$member'");
+		$dbh->do("DELETE FROM online where conference='$conference' AND member_id='$member' limit 1");
+		
+		$sql = "SELECT count(*) from online where conference='$conference' AND number='100'";
+		my $sth = $dbh->prepare($sql);
+		$sth->execute;
+		while (@row = $sth->fetchrow_array) {
+			$count = $count -$row[0];
+		}
+		
+		$dbh->do("UPDATE cdr SET duration='$duration',leavetime=NOW() WHERE uniqueid='$fulluniqueid' LIMIT 1");
+		print "UPDATE cdr SET duration='$duration',leavetime=NOW() WHERE uniqueid='$fulluniqueid' LIMIT 1\n";
+		
+		if ($flags =~ /w/) { ## Music on hold unill moderator is present
+			if ($moderators == 0) {				
+				if ($flags =~ /M/) { ## User leaving is moderator
+	
+				$sql = "SELECT channel from online where conference='$conference'";
+				my $sth = $dbh->prepare($sql);
+				$sth->execute;
+					while (@row = $sth->fetchrow_array) {
+					$tchannel = $row[0];
+					command("Action: Command${EOL}Command: konference play sound $tchannel conf-leaderhasleft mute${BLANK}");
+					command("Action: Command${EOL}Command: konference start moh $tchannel${BLANK}");
+					command("Action: Command${EOL}Command: konference mutechannel $channel${BLANK}");
+					}
+				$sth->finish;
+				}
+			}			
+		}
+		
 		#this is for announcing, we still need to add something to the asterisk dialplan, I like the announce before the beep if they
 		#are both enabled
 		if ($flags =~ /i/) {
-			$sql = "SELECT channel from online where conference='$conference'";
-			my $sth = $dbh->prepare($sql);
-			$sth->execute;
-			while (@row = $sth->fetchrow_array) {
-				$tchannel = $row[0];
-				command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasleft${BLANK}");
+			if ($count > 0) {
+				if ($count > 1) { ## only play when more then one user in the conference
+				$sql = "SELECT channel from online where conference='$conference'";
+				my $sth = $dbh->prepare($sql);
+				$sth->execute;
+					while (@row = $sth->fetchrow_array) {
+						$tchannel = $row[0];
+						command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasleft${BLANK}");
+					}
+				$sth->finish;
+				}
+			} else {
+			## No more users are in this conference - remove announce files			
+			`rm -rf /tmp/$conference`;
 			}
 		}
 		if ($flags =~ /q/) {
 		} else {
 			#play the enter tone
-			$sql = "SELECT channel from online where conference='$conference'";
+			$sql = "SELECT channel from online where conference='$conference' and number!='100'";
                         my $sth = $dbh->prepare($sql);
                         $sth->execute;
 			while (@row = $sth->fetchrow_array) {
 				$tchannel = $row[0];
-				command("Action: Command${EOL}Command: konference play sound $tchannel beep mute${BLANK}");
+				command("Action: Command${EOL}Command: konference play sound $tchannel leave mute${BLANK}");
                         }
 			
 		}
-		if ($count == 1) {
+		if ($count == 0) {
 			#see if the recorder is left over
-			$sql = "SELECT channel from online where conference='$conference' and number='900'";
+			$sql = "SELECT channel from online where conference='$conference' and number='100'";
 			my $sth = $dbh->prepare($sql);
                         $sth->execute;
 			$rchannel = "";
@@ -294,10 +359,22 @@ sub ConferenceLeave {
                         }
 			
 		}
-		if ($count == 0) {
-			$dir = "/tmp/$conference";
-			system('rm','-rf', $dir);
+		
+		
+		if ($flags =~ /h/ && $flags !=~ /w/) {
+			if ($count == 1 ) {
+			$sql = "SELECT channel from online where conference='$conference' AND number!='100'";
+				my $sth = $dbh->prepare($sql);
+				$sth->execute;
+				while (@row = $sth->fetchrow_array) {
+					$tchannel = $row[0];
+					command("Action: Command${EOL}Command: konference start moh $tchannel${BLANK}");
+				}
+			}
 		}
+		
+		
+		
 	} else {
 		print "No DBH";
 	}
@@ -312,10 +389,66 @@ sub ConferenceJoin {
 	$number = shift;
 	$name = shift;
 	$uniqueid = shift;
+	$moderators = shift;
 	if (defined($dbh)) {
-		$dbh->do("INSERT INTO online (member_id,conference,channel,number,name) values ('$member','$conference','$channel','$number','$name')");
-		#this is for announcing, we still need to add something to the asterisk dialplan, I like the announce before the beep if they
-		#are both enabled
+		$dbh->do("INSERT INTO online (member_id,conference,channel,uniqueid,number,name) values ('$member','$conference','$channel','$uniqueid','$number','$name')");
+		my $recording = 0;
+		$sql = "SELECT count(*) from online where conference='$conference' AND number='100'";
+		my $sth = $dbh->prepare($sql);
+		$sth->execute;
+		while (@row = $sth->fetchrow_array) {
+			$count = $count -$row[0];
+			$recording = 1;
+		}
+		
+		if ($flags =~ /p/) {
+			## Play how many people are in the conference
+				playcount($count,$channel);
+		}
+		
+		
+		
+		if ($flags =~ /w/) { ## Music on hold unill moderator is present
+		
+			if ($flags =~ /M/) { ## User joining is moderator
+			
+				if ($moderators >= 1) {
+					$sql = "SELECT channel from online where conference='$conference'";
+					my $sth = $dbh->prepare($sql);
+					$sth->execute;
+					while (@row = $sth->fetchrow_array) {
+							$tchannel = $row[0];
+							command("Action: Command${EOL}Command: konference stop moh $tchannel${BLANK}");
+						#command("Action: Command${EOL}Command: konference unmutechannel $channel${BLANK}");
+					}
+					$sth->finish;
+					command("Action: Command${EOL}Command: konference unmutechannel $channel${BLANK}");
+				}
+				} else {
+				if ($moderators < 1) {
+					command("Action: Command${EOL}Command: konference play sound $channel conf-waitforleader mute${BLANK}");
+					command("Action: Command${EOL}Command: konference start moh $channel${BLANK}");
+					#command("Action: Command${EOL}Command: konference mutechannel $channel${BLANK}");
+				}
+			}
+
+			
+		} else {
+			if ($flags =~ /h/) {
+				if ($count == 1 ) {
+					command("Action: Command${EOL}Command: konference start moh $channel${BLANK}");
+				} elsif ($count == 2 ) {
+					$sql = "SELECT channel from online where conference='$conference'";
+					my $sth = $dbh->prepare($sql);
+					$sth->execute;
+					while (@row = $sth->fetchrow_array) {
+						$tchannel = $row[0];
+						command("Action: Command${EOL}Command: konference stop moh $tchannel${BLANK}");
+					}
+				}
+			}
+		}
+		
 		if ($flags =~ /i/) {
 			$sql = "SELECT channel from online where conference='$conference'";
 			my $sth = $dbh->prepare($sql);
@@ -324,8 +457,10 @@ sub ConferenceJoin {
 				$tchannel = $row[0];
 				command("Action: Command${EOL}Command: konference play sound $tchannel /tmp/$conference/$uniqueid conf-hasentered${BLANK}");
 			}
+			$sth->finish;
 		}
 		if ($flags =~ /q/) {
+				
 		} else {
 			#play the enter tone
 			$sql = "SELECT channel from online where conference='$conference'";
@@ -333,8 +468,9 @@ sub ConferenceJoin {
                         $sth->execute;
 			while (@row = $sth->fetchrow_array) {
 				$tchannel = $row[0];
-				command("Action: Command${EOL}Command: konference play sound $tchannel beep mute${BLANK}");
+				command("Action: Command${EOL}Command: konference play sound $tchannel join mute${BLANK}");
                         }
+                        $sth->finish;
 			
 		}
 	} else {
@@ -417,7 +553,7 @@ sub start_recording {
 	$cmd .= "Context: konference${EOL}";
 	$cmd .= "Exten: enterconf${EOL}";
 	$cmd .= "Priority: 1${EOL}";
-	$cmd .= "Callerid: Recorder <900>${EOL}";
+	$cmd .= "Callerid: Recorder <100>${EOL}";
 	$cmd .= "Variable: conference=$conference${EOL}";
 	$cmd .= "Variable: RECORDINGFILE=$RECORDINGFILE${BLANK}";
 	command($cmd);
@@ -515,6 +651,26 @@ sub send_cmd {
         my $buf="";
         print $remote $cmd;
         return $buf;  
+}
+
+
+
+sub watchdog {
+
+if (-e "/var/run/listener.pid") {
+
+        open FILE, "/var/run/listener.pid";
+        my @lines = <FILE>;
+        foreach(@lines) {
+                 print STDERR "$t listner.pl PID found at $_ /var/run/listener.pid\n";
+        }
+        exit
+} else {
+
+print STDERR "$t Application is not running, now starting\n";
+
+}
+
 }
 
 
