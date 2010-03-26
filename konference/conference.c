@@ -798,7 +798,9 @@ static void remove_conf( struct ast_conference *conf )
 				ast_log( AST_CONF_DEBUG, "removed conference, name => %s\n", conf_current->name ) ;
 			}
 
+			// unlock and destroy read/write lock
 			ast_rwlock_unlock( &conf_current->lock ) ;
+			ast_rwlock_destroy( &conf_current->lock ) ;
 
 			free( conf_current ) ;
 			conf_current = NULL ;

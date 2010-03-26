@@ -496,9 +496,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( LOG_ERROR, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -512,6 +509,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		// free sound frame
 		if ( f != realframe )
 			ast_frfree(f) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
 
 	}
 #ifdef	VIDEO
@@ -537,9 +537,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write video frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -549,6 +546,9 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
 
 	}
 #endif
@@ -572,9 +572,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write dtmf frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -584,6 +581,10 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
+
 	}
 #endif
 #ifdef	TEXT
@@ -606,9 +607,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write text frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -618,6 +616,10 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
+
 	}
 #endif
 
@@ -834,7 +836,7 @@ int member_exec( struct ast_channel* chan, void* data )
 			// no frame has arrived yet
 			// ast_log( LOG_NOTICE, "no frame available from channel, channel => %s\n", chan->name ) ;
 		}
-		else if ( left > 0 )
+		else if ( left > 0 && chan->fdno != AST_GENERATOR_FD )
 		{
 			// a frame has come in before the latency timeout
 			// was reached, so we process the frame
@@ -1585,6 +1587,10 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	ast_mutex_unlock ( &member->lock ) ;
 
+	// destroy member mutex and condition variable
+	ast_mutex_destroy( &member->lock ) ;
+	ast_cond_destroy( &member->delete_var ) ;
+
 #ifdef	VIDEO
 	// If member is driving another member, make sure its speaker count is correct
 	if ( member->driven_member != NULL && member->speaking_state == 1 )
@@ -1622,6 +1628,9 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	if (member->inSmoother != NULL)
 		ast_smoother_free(member->inSmoother);
+	if (member->outPacker != NULL)
+		ast_packer_free(member->outPacker);
+
 #ifdef	VIDEO
 	cf = member->inVideoFrames ;
 
@@ -1647,6 +1656,12 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	while ( cf != NULL )
 	{
 		cf = delete_conf_frame( cf ) ;
+	}
+#endif
+#ifdef AST_CONF_CACHE_LAST_FRAME
+	if ( member->inFramesLast != NULL )
+	{
+		delete_conf_frame( member->inFramesLast ) ;
 	}
 #endif
 #if ( SILDET == 2 )

@@ -117,3 +117,14 @@ Documented KonferenceCount application in Dialplan.txt.
 Fix the play sound command so that it plays the input sound in the language
 specified via the channel function or the default language if the langauge is
 not set.
+
+Fix to check the file descriptor is not the generator descriptor when the
+member thread reads its channel. This is required since music on hold was added
+because two threads now read the same channel when that channel is put on hold.
+
+Fix some memory leaks found after reviewing the code: free the channel_table
+when the module is unloaded; free zeta when the speex dsp is destroyed; destroy
+member mutex and condition variable when the member is deleted; free last
+cached frame and out packer control block when the member is deleted; destroy
+conference mutex when the conference is deleted; and, finally, in process
+outgoing frames, free the conference frame before checking for a soft hangup.
