@@ -211,7 +211,7 @@ int drive(const char *conference, int src_member_id, int dst_member_id);
 int drive_channel(const char *conference, const char *src_channel, const char *dst_channel);
 #endif
 
-int play_sound_channel(int fd, const char *channel, char **file, int mute, int n);
+int play_sound_channel(int fd, const char *channel, char **file, int mute, int tone, int n);
 int stop_sound_channel(int fd, const char *channel);
 
 int start_moh_channel(int fd, const char *channel);

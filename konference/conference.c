@@ -2934,7 +2934,7 @@ static void do_video_switching(struct ast_conference *conf, int new_id, int lock
 		ast_rwlock_unlock( &conf->lock );
 }
 #endif
-int play_sound_channel(int fd, const char *channel, char **file, int mute, int n)
+int play_sound_channel(int fd, const char *channel, char **file, int mute, int tone, int n)
 {
 	struct ast_conf_member *member;
 	struct ast_conf_soundq *newsound;
@@ -2948,9 +2948,9 @@ int play_sound_channel(int fd, const char *channel, char **file, int mute, int n
 	{
 		ast_cli(fd, "Member %s not found\n", channel);
 		return 0;
-	} else if (!member->norecv_audio && !member->moh_flag)
+	} else if (!member->norecv_audio && !member->moh_flag
+			&& (!tone || !member->soundq))
 	{
-
 		while ( n-- > 0 ) {
 			if( !(newsound = calloc(1, sizeof(struct ast_conf_soundq))))
 				break ;

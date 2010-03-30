@@ -128,3 +128,7 @@ member mutex and condition variable when the member is deleted; free last
 cached frame and out packer control block when the member is deleted; destroy
 conference mutex when the conference is deleted; and, finally, in process
 outgoing frames, free the conference frame before checking for a soft hangup.
+
+Added a new option to the play sound command for exit and entrance tones. The
+new option, tone, plays a sound if and only if the soundq is empty so that
+entrance and exit tones don't run together.
