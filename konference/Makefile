@@ -85,6 +85,10 @@ CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
 #
 # CPPFLAGS += -DAC_USE_G729A
 
+#
+# Uncomment this if you want G.722 support (requires asterisk 1.6)
+#
+# CPPFLAGS += -DAC_USE_G722
 
 ifeq ($(APP_KONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_KONFERENCE_DEBUG

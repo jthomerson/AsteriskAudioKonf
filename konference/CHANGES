@@ -132,3 +132,7 @@ outgoing frames, free the conference frame before checking for a soft hangup.
 Added a new option to the play sound command for exit and entrance tones. The
 new option, tone, plays a sound if and only if the soundq is empty so that
 entrance and exit tones don't run together.
+
+Add support for the high def audio codec g722. This feature requires asterisk
+1.6 and is configurable via the Makefile variable AC_USE_G722. The default
+value is undefined, that is, the g722 codec is not available.

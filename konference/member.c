@@ -207,7 +207,11 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 		//
 		if (
 			member->dsp != NULL
+#ifndef	AC_USE_G722
 			&& f->subclass == AST_FORMAT_SLINEAR
+#else
+			&& f->subclass == AST_FORMAT_SLINEAR16
+#endif
 			&& f->datalen == AST_CONF_FRAME_DATA_SIZE
 			)
 		{
@@ -1430,8 +1434,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// set member's audio formats, taking dsp preprocessing into account
 	// ( chan->nativeformats, AST_FORMAT_SLINEAR, AST_FORMAT_ULAW, AST_FORMAT_GSM )
+#ifndef	AC_USE_G722
 	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR ;
-
+#else
+	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR16 ;
+#endif
 	member->write_format = chan->nativeformats;
 
 	// 1.2 or 1.3+
@@ -1441,16 +1448,23 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->write_format &= AST_FORMAT_AUDIO_MASK;
 #endif
 
-	// translation paths ( ast_translator_build_path() returns null if formats match )
+	//translation paths ( ast_translator_build_path() returns null if formats match )
+#ifndef	AC_USE_G722
 	member->to_slinear = ast_translator_build_path( AST_FORMAT_SLINEAR, member->read_format ) ;
 	member->from_slinear = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR ) ;
-
-	ast_log( AST_CONF_DEBUG, "AST_FORMAT_SLINEAR => %d\n", AST_FORMAT_SLINEAR ) ;
+#else
+	member->to_slinear = ast_translator_build_path( AST_FORMAT_SLINEAR16, member->read_format ) ;
+	member->from_slinear = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR16 ) ;
+#endif
 
 	// index for converted_frames array
 	switch ( member->write_format )
 	{
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
+#else
+		case AST_FORMAT_SLINEAR16:
+#endif
 			member->write_format_index = AC_SLINEAR_INDEX ;
 			break ;
 
@@ -1475,6 +1489,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->write_format_index = AC_G729A_INDEX;
 			break;
 #endif
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			member->write_format_index = AC_G722_INDEX;
+			break;
+#endif
 
 		default:
 			member->write_format_index = 0 ;
@@ -1483,7 +1502,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// index for converted_frames array
 	switch ( member->read_format )
 	{
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
+#else
+		case AST_FORMAT_SLINEAR16:
+#endif
 			member->read_format_index = AC_SLINEAR_INDEX ;
 			break ;
 
@@ -1506,6 +1529,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->read_format_index = AC_G729A_INDEX;
+			break;
+#endif
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			member->read_format_index = AC_G722_INDEX;
 			break;
 #endif
 
@@ -1534,6 +1562,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			*/
 			break;
 		case AST_FORMAT_SPEEX:
+#ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			/* this assumptions are wrong
 			member->smooth_multiple = 2 ;  // for testing, force to dual frame
@@ -1541,10 +1570,23 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->smooth_size_out = 160; // samples
 			*/
 			break;
+#endif
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
 			member->smooth_size_in  = 320; //bytes
 			member->smooth_size_out = 160; //samples
+#else
+		case AST_FORMAT_SLINEAR16:
+			member->smooth_size_in  = 640; //bytes
+			member->smooth_size_out = 320; //samples
+#endif
 			break;
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			/*
+			*/
+			break;
+#endif
 		default:
 			member->inSmoother = NULL; //don't use smoother for this type.
 			//ast_log( AST_CONF_DEBUG, "smoother is NULL for member->read_format => %d\n", member->read_format);
@@ -3355,9 +3397,11 @@ int queue_silent_frame(
 		// translators seem to be single-purpose, i.e. they
 		// can't be used simultaneously for multiple audio streams
 		//
-
+#ifndef AC_USE_G722
 		struct ast_trans_pvt* trans = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR ) ;
-
+#else
+		struct ast_trans_pvt* trans = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR16 ) ;
+#endif
 		if ( trans != NULL )
 		{
 			// attempt ( five times ) to get a silent frame
