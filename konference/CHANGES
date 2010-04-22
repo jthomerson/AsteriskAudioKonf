@@ -136,3 +136,8 @@ entrance and exit tones don't run together.
 Add support for the high def audio codec g722. This feature requires asterisk
 1.6 and is configurable via the Makefile variable AC_USE_G722. The default
 value is undefined, that is, the g722 codec is not available.
+
+Changed the thread model so that one thread mixes all the conferences. The
+advantage of this approach to mixing is that it eliminates conflicts between
+conference threads and it also reduces the load on the scheduler when there are
+many active conferences.

@@ -79,6 +79,7 @@ CFLAGS += $(shell if uname -m | grep -q ppc; then echo "-fsigned-char"; fi)
 CFLAGS += -fPIC
 CPPFLAGS += -DCRYPTO
 CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
+CPPFLAGS += -DONEMIXTHREAD
 
 #
 # Uncomment this if you want G.729A support (need to have the actual codec installed

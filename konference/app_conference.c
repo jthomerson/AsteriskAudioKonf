@@ -40,16 +40,15 @@ ASTERISK_FILE_VERSION(__FILE__, REVISION)
 #include "common.h"
 
 /*
- * a conference has n + 1 threads, where n is the number of
- * members and 1 is a conference thread which sends audio
- * back to the members.
  *
- * each member thread reads frames from the channel and
- * add's them to the member's frame queue.
+ * a conference has N threads, where N is the number of members
+ *
+ * each member thread reads frames from its channel adding them 
+ * to its frame queue which is read by the conference thread
  *
  * the conference thread reads frames from each speaking members
- * queue, mixes them, and then re-queues them for the member thread
- * to send back to the user.
+ * queue, mixes them, and then queues them to the member threads
+ *
  */
 
 static char *app = "Konference";

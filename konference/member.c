@@ -363,6 +363,7 @@ static struct ast_frame *get_next_soundframe(struct ast_conf_member *member, str
 
 again:
 	ast_mutex_unlock(&member->lock);
+again2:
     f=(member->soundq->stream && !member->soundq->stopped ? ast_readframe(member->soundq->stream) : NULL);
 
     if(!f) { // we're done with this sound; remove it from the queue, and try again
@@ -375,7 +376,7 @@ again:
 		if (toboot->stream)
 		{
 			member->chan->stream = NULL;
-			goto again;
+			goto again2;
 		}
 		//ast_log( LOG_WARNING, "trying to play sound, %s not found!?", toboot->name);
 	}
@@ -501,7 +502,7 @@ static int process_outgoing(struct ast_conf_member *member)
 		else
 		{
 			// log 'dropped' outgoing frame
-			ast_log( LOG_ERROR, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
+			ast_log( AST_CONF_DEBUG, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
 
 			// accounting: count dropped outgoing frames
 			member->frames_out_dropped++ ;

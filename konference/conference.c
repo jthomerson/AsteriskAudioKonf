@@ -57,7 +57,7 @@ static void do_video_switching(struct ast_conference *conf, int new_id, int lock
 #endif
 static struct ast_conference* find_conf(const char* name);
 static struct ast_conference* create_conf(char* name, struct ast_conf_member* member);
-static void remove_conf(struct ast_conference* conf);
+struct ast_conference* remove_conf(struct ast_conference* conf);
 static void add_member(struct ast_conf_member* member, struct ast_conference* conf);
 #ifdef	VIDEO
 static int get_new_id(struct ast_conference *conf);
@@ -67,10 +67,14 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 //
 // main conference function
 //
-
+#ifdef	ONEMIXTHREAD
+static void conference_exec()
+{
+	struct ast_conference *conf ;
+#else
 static void conference_exec( struct ast_conference *conf )
 {
-
+#endif
 	struct ast_conf_member *member;
 #if	VIDEO || DTMF
 	struct conf_frame *cfr;
@@ -87,19 +91,8 @@ static void conference_exec( struct ast_conference *conf )
 	int speaker_count ;
 	int listener_count ;
 
-	ast_log( AST_CONF_DEBUG, "Entered conference_exec, name => %s\n", conf->name ) ;
-#ifdef	REALTIME
-	int policy;
-	struct sched_param param;
+	ast_log( AST_CONF_DEBUG, "Enter conference_exec\n") ;
 
-	pthread_getschedparam(conf->conference_thread, &policy, &param);
-
-	if ( policy == SCHED_RR ) {
-		++param.sched_priority;
-		policy = SCHED_FIFO;
-		pthread_setschedparam(conf->conference_thread, policy, &param);
-	}
-#endif
 	// timer timestamps
 	struct timeval base, curr, notify ;
 	base = notify = ast_tvnow();
@@ -123,8 +116,6 @@ static void conference_exec( struct ast_conference *conf )
 	tf_base = ast_tvnow();
 
 	int res;
-
-	int oldcount = 0;
 
 	//
 	// main conference thread loop
@@ -200,338 +191,363 @@ static void conference_exec( struct ast_conference *conf )
 			{
 				ast_log(
 					LOG_WARNING,
-					"processed frame frequency variation, name => %s, member count => %d/%d, tf_count => %d, tf_diff => %ld, tf_frequency => %2.4f\n",
-					conf->name, conf->membercount, oldcount, tf_count, tf_diff, tf_frequency
+					"processed frame frequency variation, tf_count => %d, tf_diff => %ld, tf_frequency => %2.4f\n",
+						tf_count, tf_diff, tf_frequency
 				) ;
 			}
 
 			// reset values
 			tf_base = tf_curr ;
 			tf_count = 0 ;
-			oldcount = conf->membercount ;
 		}
 
 		//-----------------//
 		// INCOMING FRAMES //
 		//-----------------//
-
-		// ast_log( AST_CONF_DEBUG, "PROCESSING FRAMES, conference => %s, step => %d, ms => %ld\n",
-		//	conf->name, step, ( base.tv_usec / 20000 ) ) ;
-
+#ifdef	ONEMIXTHREAD	
 		//
-		// check if the conference is empty and if so
-		// remove it and break the loop
+		// get the first conference
 		//
 
-		// acquire the conference lock
-		ast_rwlock_rdlock(&conf->lock);
+		ast_mutex_lock(&conflist_lock) ;
+		conf = conflist ;
+		ast_mutex_unlock(&conflist_lock) ;
 
-		if ( conf->membercount == 0 )
-		{
-			if ( ((res = ast_mutex_trylock(&conflist_lock)) != 0) || (conf->membercount != 0) )
+		while ( conf ) {
+#endif
+			// ast_log( AST_CONF_DEBUG, "PROCESSING FRAMES, conference => %s, step => %d, ms => %ld\n",
+			//	conf->name, step, ( base.tv_usec / 20000 ) ) ;
+
+			// acquire the conference lock
+			ast_rwlock_rdlock(&conf->lock);
+
+			//
+			// check if the conference is empty and if so
+			// remove it and continue to the next conference
+			//
+
+			if ( conf->membercount == 0 )
 			{
-				if ( !res )
-					ast_mutex_unlock(&conflist_lock);
+				if ( ((res = ast_mutex_trylock(&conflist_lock)) != 0) || (conf->membercount != 0) )
+				{
+					if ( !res )
+						ast_mutex_unlock(&conflist_lock);
 
-				ast_rwlock_unlock(&conf->lock);
-				ast_log ( LOG_NOTICE, "conference conflist trylock failed, res => %d,  name => %s, member count => %d\n", res, conf->name, conf->membercount ) ;
-				continue;
+					ast_rwlock_unlock(&conf->lock);
+					ast_log ( LOG_NOTICE, "conference conflist trylock failed, res => %d,  name => %s, member count => %d\n", res, conf->name, conf->membercount ) ;
+					continue;
+				}
+				if (conf->debug_flag)
+				{
+					ast_log( LOG_NOTICE, "removing conference, count => %d, name => %s\n", conf->membercount, conf->name ) ;
+				}
+#ifdef	ONEMIXTHREAD
+				conf = remove_conf( conf ) ;
+
+				if ( conference_count == 0 )
+					goto done;
+#else
+				remove_conf( conf ) ;
+#endif
+				// We don't need to release the conf mutex, since it was destroyed anyway
+
+				// release the conference list lock
+				ast_mutex_unlock(&conflist_lock);
+#ifdef	ONEMIXTHREAD
+				continue ; // continue to next conference
+#else
+				break ; // break from main processing loop
+#endif
 			}
-			if (conf->debug_flag)
-			{
-				ast_log( LOG_NOTICE, "removing conference, count => %d, name => %s\n", conf->membercount, conf->name ) ;
-			}
-			remove_conf( conf ) ; // stop the conference
 
-			// We don't need to release the conf mutex, since it was destroyed anyway
+			//
+			// Start processing frames
+			//
 
-			// release the conference list lock
-			ast_mutex_unlock(&conflist_lock);
+			// update the current delivery time
+			conf->delivery_time = base ;
 
-			break ; // break from main processing loop
-		}
+			//
+			// loop through the list of members
+			// ( conf->memberlist is a single-linked list )
+			//
 
-		//
-		// Start processing frames
-		//
+			// ast_log( AST_CONF_DEBUG, "begin processing incoming audio, name => %s\n", conf->name ) ;
 
-		// update the current delivery time
-		conf->delivery_time = base ;
+			// reset speaker and listener count
+			speaker_count = 0 ;
+			listener_count = 0 ;
 
-		//
-		// loop through the list of members
-		// ( conf->memberlist is a single-linked list )
-		//
+			// get list of conference members
+			member = conf->memberlist ;
 
-		// ast_log( AST_CONF_DEBUG, "begin processing incoming audio, name => %s\n", conf->name ) ;
-
-		// reset speaker and listener count
-		speaker_count = 0 ;
-		listener_count = 0 ;
-
-		// get list of conference members
-		member = conf->memberlist ;
-
-		// reset pointer lists
-		spoken_frames = NULL ;
+			// reset pointer lists
+			spoken_frames = NULL ;
 #ifdef	VIDEO
-		// reset video source
-		video_source_member = NULL;
+			// reset video source
+			video_source_member = NULL;
 #endif
 #ifdef	DTMF
-                // reset dtmf source
-		dtmf_source_member = NULL;
+			// reset dtmf source
+			dtmf_source_member = NULL;
 #endif
-		// loop over member list to retrieve queued frames
-		while ( member != NULL )
-		{
-			member_process_spoken_frames(conf,member,&spoken_frames,time_diff,
-						     &listener_count, &speaker_count);
+			// loop over member list to retrieve queued frames
+			while ( member != NULL )
+			{
+				member_process_spoken_frames(conf,member,&spoken_frames,time_diff,
+							     &listener_count, &speaker_count);
 
-			member = member->next;
-		}
+				member = member->next;
+			}
 
-		// ast_log( AST_CONF_DEBUG, "finished processing incoming audio, name => %s\n", conf->name ) ;
+			// ast_log( AST_CONF_DEBUG, "finished processing incoming audio, name => %s\n", conf->name ) ;
 
 
-		//---------------//
-		// MIXING FRAMES //
-		//---------------//
+			//---------------//
+			// MIXING FRAMES //
+			//---------------//
 
-		// mix frames and get batch of outgoing frames
-		send_frames = mix_frames( spoken_frames, speaker_count, listener_count, conf->volume ) ;
+			// mix frames and get batch of outgoing frames
+			send_frames = mix_frames( spoken_frames, speaker_count, listener_count, conf->volume ) ;
 
-		// accounting: if there are frames, count them as one incoming frame
-		if ( send_frames != NULL )
-		{
-			// set delivery timestamp
-			//set_conf_frame_delivery( send_frames, base ) ;
-//			ast_log ( LOG_WARNING, "base = %d,%d: conf->delivery_time = %d,%d\n",base.tv_sec,base.tv_usec, conf->delivery_time.tv_sec, conf->delivery_time.tv_usec);
+			// accounting: if there are frames, count them as one incoming frame
+			if ( send_frames != NULL )
+			{
+				// set delivery timestamp
+				//set_conf_frame_delivery( send_frames, base ) ;
+	//			ast_log ( LOG_WARNING, "base = %d,%d: conf->delivery_time = %d,%d\n",base.tv_sec,base.tv_usec, conf->delivery_time.tv_sec, conf->delivery_time.tv_usec);
 
-			// ast_log( AST_CONF_DEBUG, "base => %ld.%ld %d\n", base.tv_sec, base.tv_usec, ( int )( base.tv_usec / 1000 ) ) ;
+				// ast_log( AST_CONF_DEBUG, "base => %ld.%ld %d\n", base.tv_sec, base.tv_usec, ( int )( base.tv_usec / 1000 ) ) ;
 
-			conf->stats.frames_in++ ;
-		}
+				conf->stats.frames_in++ ;
+			}
 
-		//-----------------//
-		// OUTGOING FRAMES //
-		//-----------------//
+			//-----------------//
+			// OUTGOING FRAMES //
+			//-----------------//
 
-		//
-		// loop over member list to queue outgoing frames
-		//
-		for ( member = conf->memberlist ; member != NULL ; member = member->next )
-		{
-			member_process_outgoing_frames(conf, member, send_frames);
-		}
+			//
+			// loop over member list to queue outgoing frames
+			//
+			for ( member = conf->memberlist ; member != NULL ; member = member->next )
+			{
+				member_process_outgoing_frames(conf, member, send_frames);
+			}
 #ifdef	VIDEO
-		//-------//
-		// VIDEO //
-		//-------//
+			//-------//
+			// VIDEO //
+			//-------//
 
-		curr = ast_tvnow();
-		
-		// Chat mode handling
-		// If there's only one member, then video gets reflected back to it
-		// If there are two members, then each sees the other's video
-		if ( conf->does_chat_mode &&
-		     conf->membercount > 0 &&
-		     conf->membercount <= 2
-		   )
-		{
-			struct ast_conf_member *m1, *m2;
-
-			m1 = conf->memberlist;
-			m2 = conf->memberlist->next;
+			curr = ast_tvnow();
 			
-			if ( !conf->chat_mode_on )
-				conf->chat_mode_on = 1;
+			// Chat mode handling
+			// If there's only one member, then video gets reflected back to it
+			// If there are two members, then each sees the other's video
+			if ( conf->does_chat_mode &&
+			     conf->membercount > 0 &&
+			     conf->membercount <= 2
+			   )
+			{
+				struct ast_conf_member *m1, *m2;
+
+				m1 = conf->memberlist;
+				m2 = conf->memberlist->next;
 				
-			start_video(m1);
-			if ( m2 != NULL )
-				start_video(m2);
-			
-			if ( conf->membercount == 1 )
-			{
-				cfr = get_incoming_video_frame(m1);
-				update_member_broadcasting(conf, m1, cfr, curr);
-				while ( cfr )
+				if ( !conf->chat_mode_on )
+					conf->chat_mode_on = 1;
+					
+				start_video(m1);
+				if ( m2 != NULL )
+					start_video(m2);
+				
+				if ( conf->membercount == 1 )
 				{
-					queue_outgoing_video_frame(m1, cfr->fr, conf->delivery_time);
-					delete_conf_frame(cfr);
 					cfr = get_incoming_video_frame(m1);
-				}
-			} else if ( conf->membercount == 2 )
-			{
-				cfr = get_incoming_video_frame(m1);
-				update_member_broadcasting(conf, m1, cfr, curr);
-				while ( cfr )
+					update_member_broadcasting(conf, m1, cfr, curr);
+					while ( cfr )
+					{
+						queue_outgoing_video_frame(m1, cfr->fr, conf->delivery_time);
+						delete_conf_frame(cfr);
+						cfr = get_incoming_video_frame(m1);
+					}
+				} else if ( conf->membercount == 2 )
 				{
-					queue_outgoing_video_frame(m2, cfr->fr, conf->delivery_time);
-					delete_conf_frame(cfr);
 					cfr = get_incoming_video_frame(m1);
-				}
+					update_member_broadcasting(conf, m1, cfr, curr);
+					while ( cfr )
+					{
+						queue_outgoing_video_frame(m2, cfr->fr, conf->delivery_time);
+						delete_conf_frame(cfr);
+						cfr = get_incoming_video_frame(m1);
+					}
 
-				cfr = get_incoming_video_frame(m2);
-				update_member_broadcasting(conf, m2, cfr, curr);
-				while ( cfr )
-				{
-					queue_outgoing_video_frame(m1, cfr->fr, conf->delivery_time);
-					delete_conf_frame(cfr);
 					cfr = get_incoming_video_frame(m2);
+					update_member_broadcasting(conf, m2, cfr, curr);
+					while ( cfr )
+					{
+						queue_outgoing_video_frame(m1, cfr->fr, conf->delivery_time);
+						delete_conf_frame(cfr);
+						cfr = get_incoming_video_frame(m2);
+					}
 				}
-			}
-		} else
-		{
-			// Generic conference handling (chat mode disabled or more than 2 members)
-			// If we were previously in chat mode, turn it off and stop video from members
-			if ( conf->chat_mode_on )
+			} else
 			{
-				// Send STOPVIDEO commands to everybody except the current source, if any
-				conf->chat_mode_on = 0;
-				for (member = conf->memberlist; member != NULL; member = member->next)
+				// Generic conference handling (chat mode disabled or more than 2 members)
+				// If we were previously in chat mode, turn it off and stop video from members
+				if ( conf->chat_mode_on )
 				{
-					if ( member->id != conf->current_video_source_id )
-						stop_video(member);
-				}
-			}
-			
-			// loop over the incoming frames and send to all outgoing
-			// TODO: this is an O(n^2) algorithm. Can we speed it up without sacrificing per-member switching?
-			for (video_source_member = conf->memberlist;
-			     video_source_member != NULL;
-			     video_source_member = video_source_member->next
-			    )
-			{
-				cfr = get_incoming_video_frame(video_source_member);
-				update_member_broadcasting(conf, video_source_member, cfr, curr);
-				while ( cfr )
-				{
+					// Send STOPVIDEO commands to everybody except the current source, if any
+					conf->chat_mode_on = 0;
 					for (member = conf->memberlist; member != NULL; member = member->next)
 					{
-						// skip members that are not ready or are not supposed to receive video
-						if ( !member->ready_for_outgoing || member->norecv_video )
-							continue ;
+						if ( member->id != conf->current_video_source_id )
+							stop_video(member);
+					}
+				}
+				
+				// loop over the incoming frames and send to all outgoing
+				// TODO: this is an O(n^2) algorithm. Can we speed it up without sacrificing per-member switching?
+				for (video_source_member = conf->memberlist;
+				     video_source_member != NULL;
+				     video_source_member = video_source_member->next
+				    )
+				{
+					cfr = get_incoming_video_frame(video_source_member);
+					update_member_broadcasting(conf, video_source_member, cfr, curr);
+					while ( cfr )
+					{
+						for (member = conf->memberlist; member != NULL; member = member->next)
+						{
+							// skip members that are not ready or are not supposed to receive video
+							if ( !member->ready_for_outgoing || member->norecv_video )
+								continue ;
 
-						if ( conf->video_locked )
-						{
-							// Always send video from the locked source
-							if ( conf->current_video_source_id == video_source_member->id )
-								queue_outgoing_video_frame(member, cfr->fr, conf->delivery_time);
-						} else
-						{
-							// If the member has vad switching disabled and dtmf switching enabled, use that
-							if ( member->dtmf_switch &&
-							     !member->vad_switch &&
-							     member->req_id == video_source_member->id
-							   )
+							if ( conf->video_locked )
 							{
-								queue_outgoing_video_frame(member, cfr->fr, conf->delivery_time);
+								// Always send video from the locked source
+								if ( conf->current_video_source_id == video_source_member->id )
+									queue_outgoing_video_frame(member, cfr->fr, conf->delivery_time);
 							} else
 							{
-								// If no dtmf switching, then do VAD switching
-								// The VAD switching decision code should make sure that our video source
-								// is legit
-								if ( (conf->current_video_source_id == video_source_member->id) ||
-								     (conf->current_video_source_id < 0 &&
-								      conf->default_video_source_id == video_source_member->id
-								     )
+								// If the member has vad switching disabled and dtmf switching enabled, use that
+								if ( member->dtmf_switch &&
+								     !member->vad_switch &&
+								     member->req_id == video_source_member->id
 								   )
 								{
 									queue_outgoing_video_frame(member, cfr->fr, conf->delivery_time);
+								} else
+								{
+									// If no dtmf switching, then do VAD switching
+									// The VAD switching decision code should make sure that our video source
+									// is legit
+									if ( (conf->current_video_source_id == video_source_member->id) ||
+									     (conf->current_video_source_id < 0 &&
+									      conf->default_video_source_id == video_source_member->id
+									     )
+									   )
+									{
+										queue_outgoing_video_frame(member, cfr->fr, conf->delivery_time);
+									}
 								}
+
+
 							}
+						}
+						// Garbage collection
+						delete_conf_frame(cfr);
+						cfr = get_incoming_video_frame(video_source_member);
+					}
+				}
+			}
+#endif
+#ifdef	DTMF
+			//------//
+			// DTMF //
+			//------//
 
+			// loop over the incoming frames and send to all outgoing
+			for (dtmf_source_member = conf->memberlist; dtmf_source_member != NULL; dtmf_source_member = dtmf_source_member->next)
+			{
+				while ((cfr = get_incoming_dtmf_frame( dtmf_source_member )))
+				{
+					for (member = conf->memberlist; member != NULL; member = member->next)
+					{
+						// skip members that are not ready
+						if ( member->ready_for_outgoing == 0 )
+						{
+							continue ;
+						}
 
+						if (member != dtmf_source_member)
+						{
+							// Send the latest frame
+							queue_outgoing_dtmf_frame(member, cfr->fr);
 						}
 					}
 					// Garbage collection
 					delete_conf_frame(cfr);
-					cfr = get_incoming_video_frame(video_source_member);
 				}
 			}
-		}
 #endif
-#ifdef	DTMF
-                //------//
-		// DTMF //
-		//------//
+			//---------//
+			// CLEANUP //
+			//---------//
 
-		// loop over the incoming frames and send to all outgoing
-		for (dtmf_source_member = conf->memberlist; dtmf_source_member != NULL; dtmf_source_member = dtmf_source_member->next)
-		{
-			while ((cfr = get_incoming_dtmf_frame( dtmf_source_member )))
+			// clean up send frames
+			while ( send_frames != NULL )
 			{
-				for (member = conf->memberlist; member != NULL; member = member->next)
-				{
-					// skip members that are not ready
-					if ( member->ready_for_outgoing == 0 )
-					{
-						continue ;
-					}
+				// accouting: count all frames and mixed frames
+				if ( send_frames->member == NULL )
+					conf->stats.frames_out++ ;
+				else
+					conf->stats.frames_mixed++ ;
 
-					if (member != dtmf_source_member)
-					{
- 						// Send the latest frame
-						queue_outgoing_dtmf_frame(member, cfr->fr);
-					}
-				}
-				// Garbage collection
-				delete_conf_frame(cfr);
+				// delete the frame
+				send_frames = delete_conf_frame( send_frames ) ;
 			}
-		}
-#endif
-		//---------//
-		// CLEANUP //
-		//---------//
 
-		// clean up send frames
-		while ( send_frames != NULL )
-		{
-			// accouting: count all frames and mixed frames
-			if ( send_frames->member == NULL )
-				conf->stats.frames_out++ ;
-			else
-				conf->stats.frames_mixed++ ;
+			//
+			// notify the manager of state changes every 100 milliseconds
+			// we piggyback on this for VAD switching logic
+			//
 
-			// delete the frame
-			send_frames = delete_conf_frame( send_frames ) ;
-		}
-
-		//
-		// notify the manager of state changes every 100 milliseconds
-		// we piggyback on this for VAD switching logic
-		//
-
-		if ( ( ast_tvdiff_ms(curr, notify) / AST_CONF_NOTIFICATION_SLEEP ) >= 1 )
-		{
+			if ( ( ast_tvdiff_ms(curr, notify) / AST_CONF_NOTIFICATION_SLEEP ) >= 1 )
+			{
 #ifdef	VIDEO
-			// Do VAD switching logic
-			// We need to do this here since send_state_change_notifications
-			// resets the flags
-			if ( !conf->video_locked )
-				do_VAD_switching(conf);
+				// Do VAD switching logic
+				// We need to do this here since send_state_change_notifications
+				// resets the flags
+				if ( !conf->video_locked )
+					do_VAD_switching(conf);
 #endif
-			// send the notifications
-			send_state_change_notifications( conf->memberlist ) ;
+				// send the notifications
+				send_state_change_notifications( conf->memberlist ) ;
 
-			// increment the notification timer base
-			add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
+				// increment the notification timer base
+				add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
+			}
+
+			// release conference lock
+			ast_rwlock_unlock( &conf->lock ) ;
+#ifdef	ONEMIXTHREAD
+			// get the next conference
+			conf = conf->next ;
 		}
-
-		// release conference lock
-		ast_rwlock_unlock( &conf->lock ) ;
-
-		// !!! TESTING !!!
-		// usleep( 1 ) ;
+#endif
+			// !!! TESTING !!!
+			// usleep( 1 ) ;
 	}
+#ifdef	ONEMIXTHREAD
+done:
+	ast_mutex_unlock(&conflist_lock);
+#endif
 	// end while ( 42 == 42 )
 
 	//
 	// exit the conference thread
 	//
-
-	ast_log( AST_CONF_DEBUG, "exit conference_exec\n" ) ;
+	ast_log( AST_CONF_DEBUG, "Exit conference_exec\n" ) ;
 
 	// exit the thread
 	pthread_exit( NULL ) ;
@@ -716,46 +732,62 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 #endif
 #endif
 
-	ast_log( AST_CONF_DEBUG, "added new conference to conflist, name => %s\n", name ) ;
-
 	//
 	// spawn thread for new conference, using conference_exec( conf )
 	//
+#ifdef	ONEMIXTHREAD
+	if (!conflist) {
+		if ( ast_pthread_create( &conf->conference_thread, NULL, (void*)conference_exec, NULL ) == 0 )
+		{
+#else
+		if ( ast_pthread_create( &conf->conference_thread, NULL, (void*)conference_exec, conf ) == 0 )
+		{
+			ast_log( AST_CONF_DEBUG, "started conference thread for conference, name => %s\n", conf->name ) ;
+#endif
+			// detach the thread so it doesn't leak
+			pthread_detach( conf->conference_thread ) ;
+#ifdef	REALTIME
+			// set scheduling if realtime
+			int policy;
+			struct sched_param param;
 
-	if ( ast_pthread_create( &conf->conference_thread, NULL, (void*)conference_exec, conf ) == 0 )
-	{
-		// detach the thread so it doesn't leak
-		pthread_detach( conf->conference_thread ) ;
+			pthread_getschedparam(conf->conference_thread, &policy, &param);
 
-		// add the initial member
-		add_member( member, conf ) ;
+			if ( policy == SCHED_RR ) {
+				++param.sched_priority;
+				policy = SCHED_FIFO;
+				pthread_setschedparam(conf->conference_thread, policy, &param);
+			}
+#endif
+		}
+		else
+		{
+			ast_log( LOG_ERROR, "unable to start conference thread for conference %s\n", conf->name ) ;
 
-		// prepend new conference to conflist
-		conf->next = conflist ;
-		conflist = conf ;
-
-		ast_log( AST_CONF_DEBUG, "started conference thread for conference, name => %s\n", conf->name ) ;
+			// clean up conference
+			free( conf ) ;
+			return NULL ;
+		}
+#ifdef	ONEMIXTHREAD
 	}
-	else
-	{
-		ast_log( LOG_ERROR, "unable to start conference thread for conference %s\n", conf->name ) ;
+#endif
+	// add the initial member
+	add_member( member, conf ) ;
 
-		conf->conference_thread = -1 ;
+	// prepend new conference to conflist
+	conf->next = conflist ;
+	conflist = conf ;
 
-		// clean up conference
-		free( conf ) ;
-		conf = NULL ;
-	}
+	ast_log( AST_CONF_DEBUG, "added new conference to conflist, name => %s\n", name ) ;
 
 	// count new conference
-	if ( conf != NULL )
-		++conference_count ;
+	++conference_count ;
 
 	return conf ;
 }
 
 //This function should be called with conflist_lock and conf->lock held
-static void remove_conf( struct ast_conference *conf )
+struct ast_conference *remove_conf( struct ast_conference *conf )
 {
   int c;
 
@@ -815,10 +847,15 @@ static void remove_conf( struct ast_conference *conf )
 			ast_rwlock_unlock( &conf_current->lock ) ;
 			ast_rwlock_destroy( &conf_current->lock ) ;
 
+			conf_temp = conf_current->next ;
+
 			free( conf_current ) ;
 			conf_current = NULL ;
 
-			break ;
+			// count new conference
+			--conference_count ;
+
+			return conf_temp ;
 		}
 
 		// save a refence to the soon to be previous conf
@@ -828,10 +865,7 @@ static void remove_conf( struct ast_conference *conf )
 		conf_current = conf_current->next ;
 	}
 
-	// count new conference
-	--conference_count ;
-
-	return ;
+	return NULL ;
 }
 
 #ifdef	VIDEO
