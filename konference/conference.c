@@ -91,7 +91,7 @@ static void conference_exec( struct ast_conference *conf )
 	int speaker_count ;
 	int listener_count ;
 
-	ast_log( AST_CONF_DEBUG, "Enter conference_exec\n") ;
+	//ast_log( AST_CONF_DEBUG, "Enter conference_exec\n") ;
 
 	// timer timestamps
 	struct timeval base, curr, notify ;
@@ -228,14 +228,15 @@ static void conference_exec( struct ast_conference *conf )
 
 			if ( conf->membercount == 0 )
 			{
-				if ( ((res = ast_mutex_trylock(&conflist_lock)) != 0) || (conf->membercount != 0) )
+				if ( (res = ast_mutex_trylock(&conflist_lock) != 0)  )
 				{
-					if ( !res )
-						ast_mutex_unlock(&conflist_lock);
-
 					ast_rwlock_unlock(&conf->lock);
-					ast_log ( LOG_NOTICE, "conference conflist trylock failed, res => %d,  name => %s, member count => %d\n", res, conf->name, conf->membercount ) ;
-					continue;
+					ast_log ( AST_CONF_DEBUG, "conference conflist trylock failed, res => %d,  name => %s\n", res, conf->name ) ;
+#ifdef	ONEMIXTHREAD	
+					// get the next conference
+					conf = conf->next ;
+#endif
+					continue ;
 				}
 				if (conf->debug_flag)
 				{
@@ -245,7 +246,7 @@ static void conference_exec( struct ast_conference *conf )
 				conf = remove_conf( conf ) ;
 
 				if ( conference_count == 0 )
-					goto done;
+					goto done42 ;
 #else
 				remove_conf( conf ) ;
 #endif
@@ -254,9 +255,9 @@ static void conference_exec( struct ast_conference *conf )
 				// release the conference list lock
 				ast_mutex_unlock(&conflist_lock);
 #ifdef	ONEMIXTHREAD
-				continue ; // continue to next conference
+				continue ; // next conference
 #else
-				break ; // break from main processing loop
+				break ; // main loop
 #endif
 			}
 
@@ -539,7 +540,7 @@ static void conference_exec( struct ast_conference *conf )
 			// usleep( 1 ) ;
 	}
 #ifdef	ONEMIXTHREAD
-done:
+done42:
 	ast_mutex_unlock(&conflist_lock);
 #endif
 	// end while ( 42 == 42 )
@@ -547,7 +548,8 @@ done:
 	//
 	// exit the conference thread
 	//
-	ast_log( AST_CONF_DEBUG, "Exit conference_exec\n" ) ;
+
+	//ast_log( AST_CONF_DEBUG, "Exit conference_exec\n" ) ;
 
 	// exit the thread
 	pthread_exit( NULL ) ;
@@ -564,11 +566,16 @@ void init_conference( void )
 {
 	ast_mutex_init( &conflist_lock ) ;
 
-	channel_table = malloc (CHANNEL_TABLE_SIZE * sizeof (struct channel_bucket) ) ;
 	int i;
+	channel_table = malloc (CHANNEL_TABLE_SIZE * sizeof (struct channel_bucket) ) ;
 	for ( i = 0; i < CHANNEL_TABLE_SIZE; i++)
 		AST_LIST_HEAD_INIT (&channel_table[i]) ;
 	ast_log( LOG_NOTICE, "initializing channel table, size = %d\n", CHANNEL_TABLE_SIZE ) ;
+
+	conference_table = malloc (CONFERENCE_TABLE_SIZE * sizeof (struct conference_bucket) ) ;
+	for ( i = 0; i < CONFERENCE_TABLE_SIZE; i++)
+		AST_LIST_HEAD_INIT (&conference_table[i]) ;
+	ast_log( LOG_NOTICE, "initializing conference table, size = %d\n", CONFERENCE_TABLE_SIZE ) ;
 
 	argument_delimiter = ( !strcmp(PACKAGE_VERSION,"1.4") ? "|" : "," ) ;
 }
@@ -625,29 +632,19 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 // This function should be called with conflist_lock mutex being held
 static struct ast_conference* find_conf( const char* name )
 {
-	// no conferences exist
-	if ( conflist == NULL )
-	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", name ) ;
-		return NULL ;
-	}
+	struct ast_conference *conf ;
+	struct conference_bucket *bucket = &( conference_table[hash(name) % CONFERENCE_TABLE_SIZE] ) ;
 
-	struct ast_conference *conf = conflist ;
+	AST_LIST_LOCK ( bucket ) ;
 
-	// loop through conf list
-	while ( conf != NULL )
-	{
-		if ( strncasecmp( (char*)&(conf->name), name, 80 ) == 0 )
-		{
-			// found conf name match
-			ast_log( AST_CONF_DEBUG, "found conference in conflist, name => %s\n", name ) ;
-			return conf;
+	AST_LIST_TRAVERSE ( bucket, conf, hash_entry )
+		if (!strcmp (conf->name, name) ) {
+			break ;
 		}
-		conf = conf->next ;
-	}
 
-	ast_log( AST_CONF_DEBUG, "unable to find conference in conflist, name => %s\n", name ) ;
-	return NULL;
+	AST_LIST_UNLOCK ( bucket ) ;
+
+	return conf ;
 }
 
 // This function should be called with conflist_lock held
@@ -672,6 +669,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	//
 
 	conf->next = NULL ;
+	conf->prev = NULL ;
 	conf->memberlist = NULL ;
 #ifndef	VIDEO
 	conf->memberlast = NULL ;
@@ -775,8 +773,17 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	add_member( member, conf ) ;
 
 	// prepend new conference to conflist
+	if (conflist)
+		conflist->prev = conf;
 	conf->next = conflist ;
 	conflist = conf ;
+
+	// add member to channel table
+	conf->bucket = &(conference_table[hash(conf->name) % CONFERENCE_TABLE_SIZE]);
+
+	AST_LIST_LOCK (conf->bucket ) ;
+	AST_LIST_INSERT_HEAD (conf->bucket, conf, hash_entry) ;
+	AST_LIST_UNLOCK (conf->bucket ) ;
 
 	ast_log( AST_CONF_DEBUG, "added new conference to conflist, name => %s\n", name ) ;
 
@@ -789,83 +796,67 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 //This function should be called with conflist_lock and conf->lock held
 struct ast_conference *remove_conf( struct ast_conference *conf )
 {
-  int c;
 
 	// ast_log( AST_CONF_DEBUG, "attempting to remove conference, name => %s\n", conf->name ) ;
 
-	struct ast_conference *conf_current = conflist ;
-	struct ast_conference *conf_temp = NULL ;
+	struct ast_conference *conf_temp ;
 
-	// loop through list of conferences
-	while ( conf_current != NULL )
+	//
+	// do some frame clean up
+	//
+
+	int c;
+	for ( c = 0 ; c < AC_SUPPORTED_FORMATS ; ++c )
 	{
-		// if conf_current point to the passed conf,
-		if ( conf_current == conf )
+		// free the translation paths
+		if ( conf->from_slinear_paths[ c ] != NULL )
 		{
-			if ( conf_temp == NULL )
-			{
-				// this is the first conf in the list, so we just point
-				// conflist past the current conf to the next
-				conflist = conf_current->next ;
-			}
-			else
-			{
-				// this is not the first conf in the list, so we need to
-				// point the preceeding conf to the next conf in the list
-				conf_temp->next = conf_current->next ;
-			}
-
-			//
-			// do some frame clean up
-			//
-
-			for ( c = 0 ; c < AC_SUPPORTED_FORMATS ; ++c )
-			{
-				// free the translation paths
-				if ( conf_current->from_slinear_paths[ c ] != NULL )
-				{
-					ast_translator_free_path( conf_current->from_slinear_paths[ c ] ) ;
-					conf_current->from_slinear_paths[ c ] = NULL ;
-				}
-			}
-
-			// calculate time in conference
-			// total time converted to seconds
-			long tt = ast_tvdiff_ms(ast_tvnow(),
-					conf_current->stats.time_entered) / 1000;
-
-			// report accounting information
-			if (conf->debug_flag)
-			{
-				ast_log( LOG_NOTICE, "conference accounting, fi => %ld, fo => %ld, fm => %ld, tt => %ld\n",
-					 conf_current->stats.frames_in, conf_current->stats.frames_out, conf_current->stats.frames_mixed, tt ) ;
-
-				ast_log( AST_CONF_DEBUG, "removed conference, name => %s\n", conf_current->name ) ;
-			}
-
-			// unlock and destroy read/write lock
-			ast_rwlock_unlock( &conf_current->lock ) ;
-			ast_rwlock_destroy( &conf_current->lock ) ;
-
-			conf_temp = conf_current->next ;
-
-			free( conf_current ) ;
-			conf_current = NULL ;
-
-			// count new conference
-			--conference_count ;
-
-			return conf_temp ;
+			ast_translator_free_path( conf->from_slinear_paths[ c ] ) ;
+			conf->from_slinear_paths[ c ] = NULL ;
 		}
-
-		// save a refence to the soon to be previous conf
-		conf_temp = conf_current ;
-
-		// move conf_current to the next in the list
-		conf_current = conf_current->next ;
 	}
 
-	return NULL ;
+	// report accounting information
+	if (conf->debug_flag)
+	{
+		// calculate time in conference
+		// total time converted to seconds
+		long tt = ast_tvdiff_ms(ast_tvnow(),
+				conf->stats.time_entered) / 1000;
+
+		ast_log( LOG_NOTICE, "conference accounting, fi => %ld, fo => %ld, fm => %ld, tt => %ld\n",
+			 conf->stats.frames_in, conf->stats.frames_out, conf->stats.frames_mixed, tt ) ;
+
+		ast_log( AST_CONF_DEBUG, "removed conference, name => %s\n", conf->name ) ;
+	}
+
+	AST_LIST_LOCK (conf->bucket ) ;
+	AST_LIST_REMOVE (conf->bucket, conf, hash_entry) ;
+	AST_LIST_UNLOCK (conf->bucket ) ;
+
+	// unlock and destroy read/write lock
+	ast_rwlock_unlock( &conf->lock ) ;
+	ast_rwlock_destroy( &conf->lock ) ;
+
+	conf_temp = conf->next ;
+
+	if ( conf->prev )
+		conf->prev->next = conf->next ;
+
+	if ( conf->next )
+		conf->next->prev = conf->prev ;
+
+	if ( conf == conflist )
+		conflist = conf_temp ;
+		
+
+	free( conf ) ;
+
+	// count new conference
+	--conference_count ;
+
+	return conf_temp ;
+
 }
 
 #ifdef	VIDEO
@@ -903,7 +894,7 @@ int end_conference(const char *name, int hangup )
 	conf = find_conf(name);
 	if ( conf == NULL )
 	{
-		ast_log( LOG_WARNING, "could not find conference\n" ) ;
+		ast_log( AST_CONF_DEBUG, "could not find conference\n" ) ;
 
 		// release the conference list lock
 		ast_mutex_unlock(&conflist_lock);
@@ -1257,8 +1248,8 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		member->id,
 		member->flags,
 		member->channel_name,
-		member->callerid,
-		member->callername,
+		member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
+		member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown",
 		tt,
 		moderators,
 		membercount
@@ -1335,12 +1326,12 @@ int show_conference_stats ( int fd )
 
 	struct ast_conference *conf = conflist ;
 
-	ast_cli( fd, "%-20.20s %-20.20s %-20.20s\n", "Name", "Members", "Volume" ) ;
+	ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s\n", "Name", "Members", "Volume", "Bucket" ) ;
 
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		ast_cli( fd, "%-20.20s %-20d %-20d\n", conf->name, conf->membercount, conf->volume ) ;
+		ast_cli( fd, "%-20.20s %-20d %-20d %-20ld\n", conf->name, conf->membercount, conf->volume, conf->bucket - conference_table ) ;
 		conf = conf->next ;
 	}
 
@@ -3213,17 +3204,17 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 }
 #endif
 
-int hash(const char *channel_name)
+int hash(const char *name)
 {
 	int i = 0, h = 0, g;
-	while (channel_name[i])
+	while (name[i])
 	{
-		h = (h << 4) + channel_name[i++];
+		h = (h << 4) + name[i++];
 		if ( (g = h & 0xF0000000) )
 			h ^= g >> 24;
 		h &= ~g;
 	}
-	//ast_log(AST_CONF_DEBUG, "Hashed channel_name: %s to 0x%08x\n", channel_name, h);
+	//ast_log(AST_CONF_DEBUG, "Hashed name: %s to 0x%08x\n", name, h);
 	return h;
 }
 

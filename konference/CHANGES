@@ -141,3 +141,13 @@ Changed the thread model so that one thread mixes all the conferences. The
 advantage of this approach to mixing is that it eliminates conflicts between
 conference threads and it also reduces the load on the scheduler when there are
 many active conferences.
+
+Changed find_conf so that conferences are located via a hash table rather than
+a sequential search through the conference list.  The size of the table is
+configurable via the Makefile and the default is 199 buckets.  To change the
+default table size either edit the Makefile default or specify the value on the
+command line: make CONFERENCE_TABLE_SIZE=251.  Table entries are list heads and
+chaining is used to resolve collisions so that the number of entries is not
+limited to the number of buckets in the table.  A bucket field is added to the
+conference list command output so that a conference name can be correlated with
+its hash table entry.

@@ -103,6 +103,7 @@ static int unload_module( void )
 	res |= ast_unregister_application( app2 ) ;
 
 	free( channel_table ) ;
+	free( conference_table ) ;
 
 	return res ;
 }

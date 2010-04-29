@@ -45,6 +45,9 @@
 AST_LIST_HEAD (channel_bucket, ast_conf_member) ;
 struct channel_bucket *channel_table ;
 
+AST_LIST_HEAD (conference_bucket, ast_conference) ;
+struct conference_bucket *conference_table ;
+
 typedef struct ast_conference_stats
 {
 	// conference name ( copied for ease of use )
@@ -107,8 +110,14 @@ struct ast_conference
 	// conference data lock
 	ast_rwlock_t lock ;
 
-	// pointer to next conference in single-linked list
+	// pointers to conference in doubly-linked list
 	struct ast_conference* next ;
+	struct ast_conference* prev ;
+
+	// pointer to conference's bucket list head
+	struct conference_bucket *bucket;
+	// list entry for conference's bucket list
+	AST_LIST_ENTRY(ast_conference) hash_entry ;
 
 	// pointer to translation paths
 	struct ast_trans_pvt* from_slinear_paths[ AC_SUPPORTED_FORMATS ] ;
