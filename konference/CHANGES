@@ -113,3 +113,41 @@ Added a directory to examples for munin plugins to graph conference and member
 counts. 
 
 Documented KonferenceCount application in Dialplan.txt.
+
+Fix the play sound command so that it plays the input sound in the language
+specified via the channel function or the default language if the langauge is
+not set.
+
+Fix to check the file descriptor is not the generator descriptor when the
+member thread reads its channel. This is required since music on hold was added
+because two threads now read the same channel when that channel is put on hold.
+
+Fix some memory leaks found after reviewing the code: free the channel_table
+when the module is unloaded; free zeta when the speex dsp is destroyed; destroy
+member mutex and condition variable when the member is deleted; free last
+cached frame and out packer control block when the member is deleted; destroy
+conference mutex when the conference is deleted; and, finally, in process
+outgoing frames, free the conference frame before checking for a soft hangup.
+
+Added a new option to the play sound command for exit and entrance tones. The
+new option, tone, plays a sound if and only if the soundq is empty so that
+entrance and exit tones don't run together.
+
+Add support for the high def audio codec g722. This feature requires asterisk
+1.6 and is configurable via the Makefile variable AC_USE_G722. The default
+value is undefined, that is, the g722 codec is not available.
+
+Changed the thread model so that one thread mixes all the conferences. The
+advantage of this approach to mixing is that it eliminates conflicts between
+conference threads and it also reduces the load on the scheduler when there are
+many active conferences.
+
+Changed find_conf so that conferences are located via a hash table rather than
+a sequential search through the conference list.  The size of the table is
+configurable via the Makefile and the default is 199 buckets.  To change the
+default table size either edit the Makefile default or specify the value on the
+command line: make CONFERENCE_TABLE_SIZE=251.  Table entries are list heads and
+chaining is used to resolve collisions so that the number of entries is not
+limited to the number of buckets in the table.  A bucket field is added to the
+conference list command output so that a conference name can be correlated with
+its hash table entry.

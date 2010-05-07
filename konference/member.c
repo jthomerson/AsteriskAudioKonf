@@ -271,7 +271,11 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 		//
 		if (
 			member->dsp != NULL
+#ifndef	AC_USE_G722
 			&& f->subclass == AST_FORMAT_SLINEAR
+#else
+			&& f->subclass == AST_FORMAT_SLINEAR16
+#endif
 			&& f->datalen == AST_CONF_FRAME_DATA_SIZE
 			)
 		{
@@ -423,6 +427,7 @@ static struct ast_frame *get_next_soundframe(struct ast_conf_member *member, str
 
 again:
 	ast_mutex_unlock(&member->lock);
+again2:
     f=(member->soundq->stream && !member->soundq->stopped ? ast_readframe(member->soundq->stream) : NULL);
 
     if(!f) { // we're done with this sound; remove it from the queue, and try again
@@ -430,12 +435,12 @@ again:
 
 	if (!toboot->stopped && !toboot->stream)
 	{
-		toboot->stream = ast_openstream(member->chan, toboot->name, NULL);
+		toboot->stream = ast_openstream(member->chan, toboot->name, member->chan->language);
 		//ast_log( LOG_WARNING, "trying to play sound: name = %s, stream = %p\n", toboot->name, toboot->stream);
 		if (toboot->stream)
 		{
 			member->chan->stream = NULL;
-			goto again;
+			goto again2;
 		}
 		//ast_log( LOG_WARNING, "trying to play sound, %s not found!?", toboot->name);
 	}
@@ -564,11 +569,8 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
-			ast_log( LOG_ERROR, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
+			ast_log( AST_CONF_DEBUG, "unable to write voice frame to channel, channel => %s\n", member->channel_name ) ;
 
 			// accounting: count dropped outgoing frames
 			member->frames_out_dropped++ ;
@@ -580,6 +582,9 @@ static int process_outgoing(struct ast_conf_member *member)
 		// free sound frame
 		if ( f != realframe )
 			ast_frfree(f) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
 
 	}
 #ifdef	VIDEO
@@ -605,9 +610,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write video frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -617,6 +619,9 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
 
 	}
 #endif
@@ -640,9 +645,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write dtmf frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -652,6 +654,10 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
+
 	}
 #endif
 #ifdef	TEXT
@@ -674,9 +680,6 @@ static int process_outgoing(struct ast_conf_member *member)
 		}
 		else
 		{
-			if ( member->chan->_softhangup )
-				return 1;
-
 			// log 'dropped' outgoing frame
 			ast_log( AST_CONF_DEBUG, "unable to write text frame to channel, channel => %s\n", member->channel_name ) ;
 
@@ -686,6 +689,10 @@ static int process_outgoing(struct ast_conf_member *member)
 
 		// clean up frame
 		delete_conf_frame( cf ) ;
+
+		if ( member->chan->_softhangup )
+			return 1;
+
 	}
 #endif
 
@@ -845,22 +852,6 @@ int member_exec( struct ast_channel* chan, void* data )
 		conf->membercount
 	) ;
 
-	// Store the CID information
-	if ( member->chan->cid.cid_num )
-	{
-		if ( (member->callerid = malloc(strlen(member->chan->cid.cid_num)+1)) )
-			memcpy(member->callerid,member->chan->cid.cid_num, strlen(member->chan->cid.cid_num)+1);
-	} else
-		member->callerid = NULL;
-
-	if ( member->chan->cid.cid_name )
-	{
-		if ( (member->callername = malloc(strlen(member->chan->cid.cid_name)+1)) )
-			memcpy(member->callername, member->chan->cid.cid_name, strlen(member->chan->cid.cid_name)+1);
-	} else
-		member->callername = NULL;
-
-
 	//
 	// process loop for new member ( this runs in it's own thread )
 	//
@@ -906,7 +897,7 @@ int member_exec( struct ast_channel* chan, void* data )
 			// no frame has arrived yet
 			// ast_log( LOG_NOTICE, "no frame available from channel, channel => %s\n", chan->name ) ;
 		}
-		else if ( left > 0 )
+		else if ( left > 0 && chan->fdno != AST_GENERATOR_FD )
 		{
 			// a frame has come in before the latency timeout
 			// was reached, so we process the frame
@@ -1511,8 +1502,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// set member's audio formats, taking dsp preprocessing into account
 	// ( chan->nativeformats, AST_FORMAT_SLINEAR, AST_FORMAT_ULAW, AST_FORMAT_GSM )
+#ifndef	AC_USE_G722
 	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR ;
-
+#else
+	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR16 ;
+#endif
 	member->write_format = chan->nativeformats;
 
 	// 1.2 or 1.3+
@@ -1522,16 +1516,23 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->write_format &= AST_FORMAT_AUDIO_MASK;
 #endif
 
-	// translation paths ( ast_translator_build_path() returns null if formats match )
+	//translation paths ( ast_translator_build_path() returns null if formats match )
+#ifndef	AC_USE_G722
 	member->to_slinear = ast_translator_build_path( AST_FORMAT_SLINEAR, member->read_format ) ;
 	member->from_slinear = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR ) ;
-
-	ast_log( AST_CONF_DEBUG, "AST_FORMAT_SLINEAR => %d\n", AST_FORMAT_SLINEAR ) ;
+#else
+	member->to_slinear = ast_translator_build_path( AST_FORMAT_SLINEAR16, member->read_format ) ;
+	member->from_slinear = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR16 ) ;
+#endif
 
 	// index for converted_frames array
 	switch ( member->write_format )
 	{
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
+#else
+		case AST_FORMAT_SLINEAR16:
+#endif
 			member->write_format_index = AC_SLINEAR_INDEX ;
 			break ;
 
@@ -1556,6 +1557,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->write_format_index = AC_G729A_INDEX;
 			break;
 #endif
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			member->write_format_index = AC_G722_INDEX;
+			break;
+#endif
 
 		default:
 			member->write_format_index = 0 ;
@@ -1564,7 +1570,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// index for converted_frames array
 	switch ( member->read_format )
 	{
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
+#else
+		case AST_FORMAT_SLINEAR16:
+#endif
 			member->read_format_index = AC_SLINEAR_INDEX ;
 			break ;
 
@@ -1587,6 +1597,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->read_format_index = AC_G729A_INDEX;
+			break;
+#endif
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			member->read_format_index = AC_G722_INDEX;
 			break;
 #endif
 
@@ -1615,6 +1630,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			*/
 			break;
 		case AST_FORMAT_SPEEX:
+#ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			/* this assumptions are wrong
 			member->smooth_multiple = 2 ;  // for testing, force to dual frame
@@ -1622,10 +1638,23 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->smooth_size_out = 160; // samples
 			*/
 			break;
+#endif
+#ifndef	AC_USE_G722
 		case AST_FORMAT_SLINEAR:
 			member->smooth_size_in  = 320; //bytes
 			member->smooth_size_out = 160; //samples
+#else
+		case AST_FORMAT_SLINEAR16:
+			member->smooth_size_in  = 640; //bytes
+			member->smooth_size_out = 320; //samples
+#endif
 			break;
+#ifdef AC_USE_G722
+		case AST_FORMAT_G722:
+			/*
+			*/
+			break;
+#endif
 		default:
 			member->inSmoother = NULL; //don't use smoother for this type.
 			//ast_log( AST_CONF_DEBUG, "smoother is NULL for member->read_format => %d\n", member->read_format);
@@ -1668,6 +1697,10 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	ast_mutex_unlock ( &member->lock ) ;
 
+	// destroy member mutex and condition variable
+	ast_mutex_destroy( &member->lock ) ;
+	ast_cond_destroy( &member->delete_var ) ;
+
 #ifdef	VIDEO
 	// If member is driving another member, make sure its speaker count is correct
 	if ( member->driven_member != NULL && member->speaking_state == 1 )
@@ -1705,6 +1738,9 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	if (member->inSmoother != NULL)
 		ast_smoother_free(member->inSmoother);
+	if (member->outPacker != NULL)
+		ast_packer_free(member->outPacker);
+
 #ifdef	VIDEO
 	cf = member->inVideoFrames ;
 
@@ -1730,6 +1766,12 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	while ( cf != NULL )
 	{
 		cf = delete_conf_frame( cf ) ;
+	}
+#endif
+#ifdef AST_CONF_CACHE_LAST_FRAME
+	if ( member->inFramesLast != NULL )
+	{
+		delete_conf_frame( member->inFramesLast ) ;
 	}
 #endif
 #if ( SILDET == 2 )
@@ -1772,10 +1814,6 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	// free the member's copy of the spyee channel name
 	free(member->spyee_channel_name);
-
-	// free the member's memory
-	free(member->callerid);
-	free(member->callername);
 
 	// clear all sounds
 	struct ast_conf_soundq *sound = member->soundq;
@@ -3427,9 +3465,11 @@ int queue_silent_frame(
 		// translators seem to be single-purpose, i.e. they
 		// can't be used simultaneously for multiple audio streams
 		//
-
+#ifndef AC_USE_G722
 		struct ast_trans_pvt* trans = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR ) ;
-
+#else
+		struct ast_trans_pvt* trans = ast_translator_build_path( member->write_format, AST_FORMAT_SLINEAR16 ) ;
+#endif
 		if ( trans != NULL )
 		{
 			// attempt ( five times ) to get a silent frame

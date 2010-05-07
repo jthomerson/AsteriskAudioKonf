@@ -256,6 +256,7 @@ void speex_preprocess_state_destroy(SpeexPreprocessState *st)
    speex_free(st->Smin);
    speex_free(st->Stmp);
    speex_free(st->update_prob);
+   speex_free(st->zeta);
 
    speex_free(st->noise_bands);
    speex_free(st->noise_bands2);

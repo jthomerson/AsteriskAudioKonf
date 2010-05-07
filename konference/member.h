@@ -71,9 +71,6 @@ struct ast_conf_member
 	char *spyee_channel_name ; // spyee  channel name
 	int max_users ; // zero or max users for this conference
 
-	char *callerid;
-	char *callername;
-
 	// voice flags
 	int vad_flag;
 	int denoise_flag;

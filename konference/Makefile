@@ -30,6 +30,9 @@ APP_KONFERENCE_DEBUG ?= 0
 # channel table size default
 CHANNEL_TABLE_SIZE ?= 997
 
+# conference table size default
+CONFERENCE_TABLE_SIZE ?= 199
+
 # schedule conference threads fifo ( 0 == OFF, 1 == ON )
 REALTIME ?= 1
 
@@ -79,12 +82,18 @@ CFLAGS += $(shell if uname -m | grep -q ppc; then echo "-fsigned-char"; fi)
 CFLAGS += -fPIC
 CPPFLAGS += -DCRYPTO
 CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
+CPPFLAGS += -DCONFERENCE_TABLE_SIZE=$(CONFERENCE_TABLE_SIZE)
+CPPFLAGS += -DONEMIXTHREAD
 
 #
 # Uncomment this if you want G.729A support (need to have the actual codec installed
 #
 # CPPFLAGS += -DAC_USE_G729A
 
+#
+# Uncomment this if you want G.722 support (requires asterisk 1.6)
+#
+# CPPFLAGS += -DAC_USE_G722
 
 ifeq ($(APP_KONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_KONFERENCE_DEBUG

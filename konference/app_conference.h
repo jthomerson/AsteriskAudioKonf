@@ -103,7 +103,11 @@
 // sample information for AST_FORMAT_SLINEAR format
 //
 
+#ifndef	AC_USE_G722
 #define AST_CONF_SAMPLE_RATE 8000
+#else
+#define AST_CONF_SAMPLE_RATE 16000
+#endif
 #define AST_CONF_SAMPLE_SIZE 16
 #define AST_CONF_FRAME_INTERVAL 20
 //neils#define AST_CONF_FRAME_INTERVAL 30
@@ -119,14 +123,22 @@
 // ( 160 samples * 16 bits-per-sample / 8 bits-per-byte ) = 320 bytes
 //
 
+#ifndef	AC_USE_G722
 // 160 samples 16-bit signed linear
 #define AST_CONF_BLOCK_SAMPLES 160
+#else
+#define AST_CONF_BLOCK_SAMPLES 320
+#endif
 
 // 2 bytes per sample ( i.e. 16-bit )
 #define AST_CONF_BYTES_PER_SAMPLE 2
 
+#ifndef	AC_USE_G722
 // 320 bytes for each 160 sample frame of 16-bit audio
 #define AST_CONF_FRAME_DATA_SIZE 320
+#else
+#define AST_CONF_FRAME_DATA_SIZE 640
+#endif
 
 // 1000 ms-per-second / 20 ms-per-frame = 50 frames-per-second
 #define AST_CONF_FRAMES_PER_SECOND ( 1000 / AST_CONF_FRAME_INTERVAL )
@@ -212,13 +224,20 @@
 //
 // format translation values
 //
-#ifdef AC_USE_G729A
-	#define AC_SUPPORTED_FORMATS 6
-	enum { AC_SLINEAR_INDEX = 0, AC_ULAW_INDEX, AC_ALAW_INDEX, AC_GSM_INDEX, AC_SPEEX_INDEX, AC_G729A_INDEX } ;
-#else
-	#define AC_SUPPORTED_FORMATS 5
-	enum { AC_SLINEAR_INDEX = 0, AC_ULAW_INDEX, AC_ALAW_INDEX, AC_GSM_INDEX, AC_SPEEX_INDEX } ;
+	enum { 
+		AC_SLINEAR_INDEX = 0,
+		AC_ULAW_INDEX,
+		AC_ALAW_INDEX,
+		AC_GSM_INDEX,
+		AC_SPEEX_INDEX,
+#ifdef	AC_USE_G729A
+		AC_G729A_INDEX,
 #endif
+#ifdef	AC_USE_G722
+		AC_G722_INDEX,
+#endif
+		AC_SUPPORTED_FORMATS
+		} ;
 
 //
 // Default conference max users is zero, that is, unbounded
