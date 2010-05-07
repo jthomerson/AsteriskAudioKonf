@@ -102,6 +102,9 @@ struct ast_conf_member
 	// hold option flag
 	char hold_flag;
 
+	// recording wanted flag
+	char record_flag;
+
 	// wait option flag
 	char wait_for_moderator_flag;
 
