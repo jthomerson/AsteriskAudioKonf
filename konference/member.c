@@ -710,6 +710,8 @@ int member_exec( struct ast_channel* chan, void* data )
 
 	struct ast_conference *conf ;
 	struct ast_conf_member *member ;
+	const char *recfile = NULL, *recformat = NULL;
+	char recdefaultfile[AST_MAX_EXTENSION];
 
 	struct ast_frame *f ; // frame received from ast_read()
 
@@ -773,11 +775,28 @@ int member_exec( struct ast_channel* chan, void* data )
 	}
 
 	//
+	// recording
+	//
+	if (member->record_flag)
+	{
+		recfile = pbx_builtin_getvar_helper(chan, "KONFERENCE_RECORDINGFILE");
+		if (!recfile) {
+			snprintf(recdefaultfile, sizeof(recdefaultfile),
+				 "konference-%s-%s", member->conf_name, member->uniqueid);
+			recfile = recdefaultfile;
+		}
+
+		recformat = pbx_builtin_getvar_helper(chan, "KONFERENCE_RECORDINGFORMAT");
+		if (!recformat)
+			recformat = "wav";
+	}
+
+	//
 	// setup a conference for the new member
 	//
 
 	char max_users_flag = 0 ;
-	conf = join_conference( member, &max_users_flag ) ;
+	conf = join_conference( member, &max_users_flag, recfile, recformat ) ;
 
 	if ( conf == NULL )
 	{
@@ -1364,7 +1383,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		else
 #endif
 		{
-			// allowed flags are C, c, L, l, V, D, A, C, X, R, T, t, M, S, z, o, F, H
+			// allowed flags are C, c, L, l, V, D, A, C, X, r, R, T, t, M, S, z, o, F, H
 			// mute/no_recv options
 			switch ( flags[i] )
 			{
@@ -1402,6 +1421,9 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #endif
 			case 'R':
 				member->dtmf_relay = 1;
+				break;
+			case 'r':
+				member->record_flag = 1;
 				break;
 			case 's':
 				member->dtmf_star_menu = 1;

@@ -31,6 +31,7 @@
 #include "asterisk/autoconfig.h"
 #include "conference.h"
 #include "asterisk/utils.h"
+#include "asterisk/file.h"
 
 #include "asterisk/app.h"
 #include "asterisk/say.h"
@@ -86,6 +87,8 @@ static void conference_exec( struct ast_conference *conf )
 	struct ast_conf_member *dtmf_source_member;
 #endif
 	struct conf_frame *spoken_frames, *send_frames;
+	struct ast_filestream *s = NULL;
+	const char *recfile = NULL;
 
 	// count number of speakers, number of listeners
 	int speaker_count ;
@@ -279,6 +282,21 @@ static void conference_exec( struct ast_conference *conf )
 			speaker_count = 0 ;
 			listener_count = 0 ;
 
+			if (conf->recfile != recfile)
+			{
+				recfile = conf->recfile;
+				if (s)
+					ast_closestream(s);
+				s = ast_writefile(conf->recfile, conf->recformat, NULL,
+						  O_CREAT|O_TRUNC|O_WRONLY, 0, 0644);
+				if (s)
+					ast_log(LOG_NOTICE, "Recording conference to %s in format %s\n",
+						conf->recfile, conf->recformat);
+			}
+
+			if (s)
+				listener_count++;
+
 			// get list of conference members
 			member = conf->memberlist ;
 
@@ -333,6 +351,22 @@ static void conference_exec( struct ast_conference *conf )
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
 				member_process_outgoing_frames(conf, member, send_frames);
+			}
+
+			if (s)
+			{
+				conf_frame *f;
+				int found = 0;
+
+				for (f = send_frames; f != NULL; f = f->next)
+				{
+					if (f->member != NULL)
+						continue;
+					ast_writestream(s, f->fr);
+					found = 1;
+				}
+				if ((!found) && (f = get_silent_frame()) != NULL)
+					ast_writestream(s, f->converted[AC_SLINEAR_INDEX]);
 			}
 #ifdef	VIDEO
 			//-------//
@@ -549,6 +583,9 @@ done42:
 	// exit the conference thread
 	//
 
+	if (s)
+		ast_closestream(s);
+
 	//ast_log( AST_CONF_DEBUG, "Exit conference_exec\n" ) ;
 
 	// exit the thread
@@ -580,14 +617,12 @@ void init_conference( void )
 	argument_delimiter = ( !strcmp(PACKAGE_VERSION,"1.4") ? "|" : "," ) ;
 }
 
-struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag )
+struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag, const char* recfile, const char *recformat )
 {
 	struct ast_conference* conf = NULL ;
 
 	// acquire the conference list lock
 	ast_mutex_lock(&conflist_lock);
-
-
 
 	// look for an existing conference
 	ast_log( AST_CONF_DEBUG, "attempting to find requested conference\n" ) ;
@@ -621,6 +656,12 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 			*max_users_flag = 1;
 			conf = NULL;
 		}
+	}
+
+	if (conf && recfile && !conf->recfile)
+	{
+		conf->recfile = strdup(recfile);
+		conf->recformat = strdup(recformat);
 	}
 
 	// release the conference list lock
@@ -849,6 +890,11 @@ struct ast_conference *remove_conf( struct ast_conference *conf )
 	if ( conf == conflist )
 		conflist = conf_temp ;
 		
+
+	if (conf->recfile)
+		free(conf->recfile);
+	if (conf->recformat)
+		free(conf->recformat);
 
 	free( conf ) ;
 
