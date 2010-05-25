@@ -151,3 +151,7 @@ chaining is used to resolve collisions so that the number of entries is not
 limited to the number of buckets in the table.  A bucket field is added to the
 conference list command output so that a conference name can be correlated with
 its hash table entry.
+
+Changed preprocessor flag, APP_KONFERENCE_DEBUG, so that debug logging is
+enabled only if it's defined. To enable debug logging: edit the Makefile or
+set it on the command line: make APP_KONFERENCE_DEBUG=1.

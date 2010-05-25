@@ -68,13 +68,11 @@
 // app_conference defines
 //
 
-// debug logging level
-
-// LOG_NOTICE for debugging, LOG_DEBUG for production
+// debug logging
 #ifdef APP_KONFERENCE_DEBUG
-#define AST_CONF_DEBUG LOG_NOTICE
+#define	DEBUG(...) ast_log(LOG_DEBUG, __VA_ARGS__)
 #else
-#define AST_CONF_DEBUG LOG_DEBUG
+#define	DEBUG(...)
 #endif
 
 //
@@ -159,8 +157,10 @@
 #define AST_CONF_MAX_VIDEO_QUEUE 800
 #endif
 
+#ifdef	DTMF
 // max dtmf frames in the queue
 #define AST_CONF_MAX_DTMF_QUEUE 8
+#endif
 
 #ifdef	TEXT
 // max text frames in the queue

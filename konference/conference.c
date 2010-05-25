@@ -70,7 +70,7 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 #ifdef	ONEMIXTHREAD
 static void conference_exec()
 {
-	struct ast_conference *conf ;
+	struct ast_conference *conf = NULL ;
 #else
 static void conference_exec( struct ast_conference *conf )
 {
@@ -91,7 +91,7 @@ static void conference_exec( struct ast_conference *conf )
 	int speaker_count ;
 	int listener_count ;
 
-	//ast_log( AST_CONF_DEBUG, "Enter conference_exec\n") ;
+	//DEBUG("Enter conference_exec\n") ;
 
 	// timer timestamps
 	struct timeval base, curr, notify ;
@@ -100,9 +100,9 @@ static void conference_exec( struct ast_conference *conf )
 	// holds differences of curr and base
 	long time_diff = 0 ;
 	long time_sleep = 0 ;
-
+#ifdef	APP_KONFERENCE_DEBUG
 	int since_last_slept = 0 ;
-
+#endif
 	//
 	// variables for checking thread frequency
 	//
@@ -136,12 +136,13 @@ static void conference_exec( struct ast_conference *conf )
 		{
 			// sleep for sleep_time ( as milliseconds )
 			usleep( time_sleep * 1000 ) ;
-
+#ifdef	APP_KONFERENCE_DEBUG
 			// reset since last slept counter
 			since_last_slept = 0 ;
-
+#endif
 			continue ;
 		}
+#ifdef	APP_KONFERENCE_DEBUG
 		else
 		{
 			// long sleep warning
@@ -150,11 +151,7 @@ static void conference_exec( struct ast_conference *conf )
 				&& time_diff > AST_CONF_CONFERENCE_SLEEP * 2
 			)
 			{
-				ast_log(
-					AST_CONF_DEBUG,
-					"long scheduling delay, time_diff => %ld, AST_CONF_FRAME_INTERVAL => %d\n",
-					time_diff, AST_CONF_FRAME_INTERVAL
-				) ;
+				DEBUG("long scheduling delay, time_diff => %ld, AST_CONF_FRAME_INTERVAL => %d\n", time_diff, AST_CONF_FRAME_INTERVAL) ;
 			}
 
 			// increment times since last slept
@@ -164,7 +161,7 @@ static void conference_exec( struct ast_conference *conf )
 			if ( since_last_slept % 2 )
 				usleep( 0 ) ;
 		}
-
+#endif
 		// adjust the timer base ( it will be used later to timestamp outgoing frames )
 		add_milliseconds( &base, AST_CONF_FRAME_INTERVAL ) ;
 
@@ -209,14 +206,18 @@ static void conference_exec( struct ast_conference *conf )
 		// get the first conference
 		//
 
-		ast_mutex_lock(&conflist_lock) ;
-		conf = conflist ;
-		ast_mutex_unlock(&conflist_lock) ;
-
+		if ( (res = ast_mutex_trylock(&conflist_lock) == 0)  ) {
+			conf = conflist ;
+			ast_mutex_unlock(&conflist_lock) ;
+		}
+#ifdef	APP_KONFERENCE_DEBUG
+		else {
+			DEBUG("conference conflist trylock failed, res => %d\n", res) ;
+		}
+#endif
 		while ( conf ) {
 #endif
-			// ast_log( AST_CONF_DEBUG, "PROCESSING FRAMES, conference => %s, step => %d, ms => %ld\n",
-			//	conf->name, step, ( base.tv_usec / 20000 ) ) ;
+			//DEBUG("PROCESSING FRAMES, conference => %s, ms => %ld\n", conf->name, ( base.tv_usec / 20000 )) ;
 
 			// acquire the conference lock
 			ast_rwlock_rdlock(&conf->lock);
@@ -231,17 +232,19 @@ static void conference_exec( struct ast_conference *conf )
 				if ( (res = ast_mutex_trylock(&conflist_lock) != 0)  )
 				{
 					ast_rwlock_unlock(&conf->lock);
-					ast_log ( AST_CONF_DEBUG, "conference conflist trylock failed, res => %d,  name => %s\n", res, conf->name ) ;
+					DEBUG("conference conflist trylock failed, res => %d,  name => %s\n", res, conf->name) ;
 #ifdef	ONEMIXTHREAD	
 					// get the next conference
 					conf = conf->next ;
 #endif
 					continue ;
 				}
+#ifdef	APPKONFERENCE_DEBUG
 				if (conf->debug_flag)
 				{
-					ast_log( LOG_NOTICE, "removing conference, count => %d, name => %s\n", conf->membercount, conf->name ) ;
+					DEBUG("removing conference, count => %d, name => %s\n", conf->membercount, conf->name) ;
 				}
+#endif
 #ifdef	ONEMIXTHREAD
 				conf = remove_conf( conf ) ;
 
@@ -273,7 +276,7 @@ static void conference_exec( struct ast_conference *conf )
 			// ( conf->memberlist is a single-linked list )
 			//
 
-			// ast_log( AST_CONF_DEBUG, "begin processing incoming audio, name => %s\n", conf->name ) ;
+			//DEBUG("begin processing incoming audio, name => %s\n", conf->name) ;
 
 			// reset speaker and listener count
 			speaker_count = 0 ;
@@ -301,7 +304,7 @@ static void conference_exec( struct ast_conference *conf )
 				member = member->next;
 			}
 
-			// ast_log( AST_CONF_DEBUG, "finished processing incoming audio, name => %s\n", conf->name ) ;
+			//DEBUG("finished processing incoming audio, name => %s\n", conf->name) ;
 
 
 			//---------------//
@@ -318,7 +321,7 @@ static void conference_exec( struct ast_conference *conf )
 				//set_conf_frame_delivery( send_frames, base ) ;
 	//			ast_log ( LOG_WARNING, "base = %d,%d: conf->delivery_time = %d,%d\n",base.tv_sec,base.tv_usec, conf->delivery_time.tv_sec, conf->delivery_time.tv_usec);
 
-				// ast_log( AST_CONF_DEBUG, "base => %ld.%ld %d\n", base.tv_sec, base.tv_usec, ( int )( base.tv_usec / 1000 ) ) ;
+				//DEBUG("base => %ld.%ld %d\n", base.tv_sec, base.tv_usec, ( int )( base.tv_usec / 1000 )) ;
 
 				conf->stats.frames_in++ ;
 			}
@@ -549,7 +552,7 @@ done42:
 	// exit the conference thread
 	//
 
-	//ast_log( AST_CONF_DEBUG, "Exit conference_exec\n" ) ;
+	DEBUG("Exit conference_exec\n") ;
 
 	// exit the thread
 	pthread_exit( NULL ) ;
@@ -590,14 +593,14 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 
 
 	// look for an existing conference
-	ast_log( AST_CONF_DEBUG, "attempting to find requested conference\n" ) ;
+	DEBUG("attempting to find requested conference\n") ;
 	conf = find_conf( member->conf_name ) ;
 
 	// unable to find an existing conference, try to create one
 	if ( conf == NULL )
 	{
 		// create a new conference
-		ast_log( AST_CONF_DEBUG, "attempting to create requested conference\n" ) ;
+		DEBUG("attempting to create requested conference\n") ;
 
 		// create the new conference with one member
 		conf = create_conf( member->conf_name, member ) ;
@@ -650,7 +653,7 @@ static struct ast_conference* find_conf( const char* name )
 // This function should be called with conflist_lock held
 static struct ast_conference* create_conf( char* name, struct ast_conf_member* member )
 {
-	ast_log( AST_CONF_DEBUG, "entered create_conf, name => %s\n", name ) ;
+	DEBUG("entered create_conf, name => %s\n", name) ;
 
 	//
 	// allocate memory for conference
@@ -676,9 +679,9 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 #endif
 	conf->membercount = 0 ;
 	conf->conference_thread = -1 ;
-
+#ifdef	APPKONFERENCE_DEBUG
 	conf->debug_flag = 0 ;
-
+#endif
 	conf->kick_flag = 0 ;
 
 	conf->id_count = 0;
@@ -740,7 +743,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 #else
 		if ( ast_pthread_create( &conf->conference_thread, NULL, (void*)conference_exec, conf ) == 0 )
 		{
-			ast_log( AST_CONF_DEBUG, "started conference thread for conference, name => %s\n", conf->name ) ;
+			DEBUG("started conference thread for conference, name => %s\n", conf->name) ;
 #endif
 			// detach the thread so it doesn't leak
 			pthread_detach( conf->conference_thread ) ;
@@ -785,7 +788,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	AST_LIST_INSERT_HEAD (conf->bucket, conf, hash_entry) ;
 	AST_LIST_UNLOCK (conf->bucket ) ;
 
-	ast_log( AST_CONF_DEBUG, "added new conference to conflist, name => %s\n", name ) ;
+	DEBUG("added new conference to conflist, name => %s\n", name) ;
 
 	// count new conference
 	++conference_count ;
@@ -797,7 +800,7 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 struct ast_conference *remove_conf( struct ast_conference *conf )
 {
 
-	// ast_log( AST_CONF_DEBUG, "attempting to remove conference, name => %s\n", conf->name ) ;
+	DEBUG("attempting to remove conference, name => %s\n", conf->name) ;
 
 	struct ast_conference *conf_temp ;
 
@@ -815,20 +818,21 @@ struct ast_conference *remove_conf( struct ast_conference *conf )
 			conf->from_slinear_paths[ c ] = NULL ;
 		}
 	}
-
-	// report accounting information
+#ifdef	APP_KONFERENCE_DEBUG
 	if (conf->debug_flag)
 	{
+		// report accounting information
+
 		// calculate time in conference
 		// total time converted to seconds
 		long tt = ast_tvdiff_ms(ast_tvnow(),
 				conf->stats.time_entered) / 1000;
 
-		ast_log( LOG_NOTICE, "conference accounting, fi => %ld, fo => %ld, fm => %ld, tt => %ld\n",
-			 conf->stats.frames_in, conf->stats.frames_out, conf->stats.frames_mixed, tt ) ;
+		DEBUG("conference accounting, fi => %ld, fo => %ld, fm => %ld, tt => %ld\n", conf->stats.frames_in, conf->stats.frames_out, conf->stats.frames_mixed, tt) ;
 
-		ast_log( AST_CONF_DEBUG, "removed conference, name => %s\n", conf->name ) ;
 	}
+#endif
+	DEBUG("removed conference, name => %s\n", conf->name) ;
 
 	AST_LIST_LOCK (conf->bucket ) ;
 	AST_LIST_REMOVE (conf->bucket, conf, hash_entry) ;
@@ -894,7 +898,7 @@ int end_conference(const char *name, int hangup )
 	conf = find_conf(name);
 	if ( conf == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "could not find conference\n" ) ;
+		DEBUG("could not find conference\n") ;
 
 		// release the conference list lock
 		ast_mutex_unlock(&conflist_lock);
@@ -1021,7 +1025,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	member->initial_id = new_initial_id;
 
 
-	ast_log( AST_CONF_DEBUG, "new video id %d\n", newid) ;
+	DEBUG("new video id %d\n", newid) ;
 
 	int last_id;
 	if (conf->memberlist) last_id = conf->memberlist->id;
@@ -1052,7 +1056,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	// release the conference lock
 	ast_rwlock_unlock( &conf->lock ) ;
 
-	ast_log( AST_CONF_DEBUG, "member added to conference, name => %s\n", conf->name ) ;
+	DEBUG("member added to conference, name => %s\n", conf->name) ;
 
 	return ;
 }
@@ -1125,25 +1129,19 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		if ( member_list == member )
 		{
 #endif
-			//
-			// log some accounting information
-			//
-
 			// calculate time in conference (in seconds)
 			tt = ast_tvdiff_ms(ast_tvnow(),
 					member->time_entered) / 1000;
-
+#ifdef	APP_KONFERENCE_DEBUG
 			if (conf->debug_flag)
 			{
-				ast_log(
-					LOG_NOTICE,
-					"member accounting, channel => %s, te => %ld, fi => %ld, fid => %ld, fo => %ld, fod => %ld, tt => %ld\n",
-					member->channel_name,
-					member->time_entered.tv_sec, member->frames_in, member->frames_in_dropped,
-					member->frames_out, member->frames_out_dropped, tt
-					) ;
-			}
+				//
+				// log some accounting information
+				//
 
+				DEBUG("member accounting, channel => %s, te => %ld, fi => %ld, fid => %ld, fo => %ld, fod => %ld, tt => %ld\n", member->channel_name, member->time_entered.tv_sec, member->frames_in, member->frames_in_dropped, member->frames_out, member->frames_out_dropped, tt) ;
+			}
+#endif
 			//
 			// if this is the first member in the linked-list,
 			// skip over the first member in the list, else
@@ -1215,8 +1213,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 #endif
 	ast_rwlock_unlock( &conf->lock );
 
-	ast_log( AST_CONF_DEBUG, "removed member from conference, name => %s, remaining => %d\n",
-			member->conf_name, membercount ) ;
+	DEBUG("removed member from conference, name => %s, remaining => %d\n", member->conf_name, membercount) ;
 
 	// remove member from channel table
 	if ( member->bucket != NULL )
@@ -1224,7 +1221,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		AST_LIST_LOCK (member->bucket ) ;
 		AST_LIST_REMOVE (member->bucket, member, hash_entry) ;
 		AST_LIST_UNLOCK (member->bucket ) ;
-		//ast_log( AST_CONF_DEBUG, "Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table ) ;
+		DEBUG("Removed %s from the channel table, bucket => %ld\n", member->chan->name, member->bucket - channel_table) ;
 	}
 
 	// output to manager...
@@ -1260,6 +1257,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 
 }
 
+#ifdef	APP_KONFERENCE_DEBUG
 //
 // returns: -1 => error, 0 => debugging off, 1 => debugging on
 // state: on => 1, off => 0, toggle => -1
@@ -1305,7 +1303,7 @@ int set_conference_debugging( const char* name, int state )
 
 	return new_state ;
 }
-
+#endif
 
 int get_conference_count( void )
 {
@@ -1317,7 +1315,7 @@ int show_conference_stats ( int fd )
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized.\n") ;
+		DEBUG("conflist has not yet been initialized.\n") ;
 		return 0 ;
 	}
 
@@ -1350,7 +1348,7 @@ int show_conference_list ( int fd, const char *name )
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", name ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", name) ;
 		return 0 ;
 	}
 
@@ -1425,7 +1423,7 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 
   // no conferences exist
 	if ( conflist == NULL )
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", conffilter );;
+		DEBUG("conflist has not yet been initialized, name => %s\n", conffilter) ;
 
 	if (!ast_strlen_zero(id)) {
 		snprintf(idText,256,"ActionID: %s\r\n",id);
@@ -1525,7 +1523,7 @@ int kick_member (  const char* confname, int user_id)
 	// no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG( "conflist has not yet been initialized, name => %s\n", confname ) ;
 		return 0 ;
 	}
 
@@ -1576,7 +1574,7 @@ int kick_all ( void )
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized\n" ) ;
+		DEBUG("conflist has not yet been initialized\n" ) ;
 		return 0 ;
 	}
 
@@ -1618,7 +1616,7 @@ int mute_member (  const char* confname, int user_id)
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1673,7 +1671,7 @@ int mute_conference (  const char* confname)
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1729,7 +1727,7 @@ int unmute_member (  const char* confname, int user_id)
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1784,7 +1782,7 @@ int unmute_conference (  const char* confname)
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1840,7 +1838,7 @@ int viewstream_switch ( const char* confname, int user_id, int stream_id )
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1894,7 +1892,7 @@ int viewchannel_switch ( const char* confname, const char* userchan, const char*
         // no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", confname ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", confname) ;
 		return 0 ;
 	}
 
@@ -1959,7 +1957,7 @@ int get_conference_stats( ast_conference_stats* stats, int requested )
 	// no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialize\n" ) ;
+		DEBUG("conflist has not yet been initialize\n") ;
 		return 0 ;
 	}
 
@@ -1996,7 +1994,7 @@ int get_conference_stats_by_name( ast_conference_stats* stats, const char* name 
 	// no conferences exist
 	if ( conflist == NULL )
 	{
-		ast_log( AST_CONF_DEBUG, "conflist has not yet been initialized, name => %s\n", name ) ;
+		DEBUG("conflist has not yet been initialized, name => %s\n", name) ;
 		return 0 ;
 	}
 
@@ -3214,7 +3212,7 @@ int hash(const char *name)
 			h ^= g >> 24;
 		h &= ~g;
 	}
-	//ast_log(AST_CONF_DEBUG, "Hashed name: %s to 0x%08x\n", name, h);
+	DEBUG("Hashed name: %s to 0x%08x\n", name, h) ;
 	return h;
 }
 

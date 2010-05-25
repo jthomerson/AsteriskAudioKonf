@@ -127,7 +127,7 @@ char *conference_restart(struct ast_cli_entry *e, int cmd, struct ast_cli_args *
 	kick_all();
 	return SUCCESS ;
 }
-
+#ifdef	APP_KONFERENCE_DEBUG
 //
 // debug functions
 //
@@ -197,7 +197,7 @@ char *conference_debug(struct ast_cli_entry *e, int cmd, struct ast_cli_args *a)
 
 	return SUCCESS ;
 }
-
+#endif
 //
 // stats functions
 //
@@ -1740,7 +1740,9 @@ char *conference_drivechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_a
 static struct ast_cli_entry app_konference_commands[] = {
 	AST_CLI_DEFINE(conference_version, conference_version_summary),
 	AST_CLI_DEFINE(conference_restart, conference_restart_summary),
+#ifdef	APP_KONFERENCE_DEBUG
 	AST_CLI_DEFINE(conference_debug, conference_debug_summary),
+#endif
 	AST_CLI_DEFINE(conference_show_stats, conference_show_stats_summary),
 	AST_CLI_DEFINE(conference_list, conference_list_summary),
 	AST_CLI_DEFINE(conference_kick, conference_kick_summary),
@@ -1793,7 +1795,9 @@ void register_conference_cli( void )
 #else
 	ast_cli_register( &cli_version );
 	ast_cli_register( &cli_restart );
+#ifdef	APP_KONFERENCE_DEBUG
 	ast_cli_register( &cli_debug ) ;
+#endif
 	ast_cli_register( &cli_show_stats ) ;
 	ast_cli_register( &cli_list );
 	ast_cli_register( &cli_kick );
@@ -1849,7 +1853,9 @@ void unregister_conference_cli( void )
 #else
 	ast_cli_unregister( &cli_version );
 	ast_cli_unregister( &cli_restart );
+#ifdef	APP_KONFERENCE_DEBUG
 	ast_cli_unregister( &cli_debug ) ;
+#endif
 	ast_cli_unregister( &cli_show_stats ) ;
 	ast_cli_unregister( &cli_list );
 	ast_cli_unregister( &cli_kick );
