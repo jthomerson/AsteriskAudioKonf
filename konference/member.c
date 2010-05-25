@@ -94,7 +94,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			if (f->subclass == '*')
 			{
 				member->star_pressed = 1;
-				ast_log( AST_CONF_DEBUG, "star was pressed\n" );
+				DEBUG( "star was pressed\n" );
 			}
 			else
 			{
@@ -107,30 +107,30 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 					case '1' :
 						if (member->mute_audio == 0)
 						{
-							ast_log( AST_CONF_DEBUG, "muting member\n" );
+							DEBUG( "muting member\n" );
 							member->mute_audio = 1;
 							if (!ast_streamfile(member->chan, "conf-muted", member->chan->language))
 								ast_waitstream(member->chan, "");
 						}
 						else if (member->mute_audio == 1)
 						{
-							ast_log( AST_CONF_DEBUG, "unmuting member\n" );
+							DEBUG( "unmuting member\n" );
 							member->mute_audio = 0;
 							if (!ast_streamfile(member->chan, "conf-unmuted", member->chan->language))
 								ast_waitstream(member->chan, "");
 						}
 						break;
 					case '2' :
-						ast_log( AST_CONF_DEBUG, "not implemented: lock/unlock conference\n" );
+						DEBUG( "not implemented: lock/unlock conference\n" );
 						break;
 					case '3' :
-						ast_log( AST_CONF_DEBUG, "not implemented: eject last user that joined conference\n" );
+						DEBUG( "not implemented: eject last user that joined conference\n" );
 						break;
 					case '4' :
-						ast_log( AST_CONF_DEBUG, "not implemented: lower volume\n" );
+						DEBUG( "not implemented: lower volume\n" );
 						break;
 					case '6' :
-						ast_log( AST_CONF_DEBUG, "not implemented: raise volume\n" );
+						DEBUG( "not implemented: raise volume\n" );
 						break;
 					case '8' :
 						// this is a no-op - allows star_pressed to be reset to zero to stop volume adjustment
@@ -138,12 +138,12 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 					case '7' :
 						member->listen_volume--;
 						member->star_pressed = 1;
-						ast_log( AST_CONF_DEBUG, "lower my volume (now: %d)\n", member->listen_volume );
+						DEBUG( "lower my volume (now: %d)\n", member->listen_volume );
 						break;
 					case '9' :
 						member->listen_volume++;
 						member->star_pressed = 1;
-						ast_log( AST_CONF_DEBUG, "raise my volume (now: %d)\n", member->listen_volume );
+						DEBUG( "raise my volume (now: %d)\n", member->listen_volume );
 						break;
 					}
 				}
