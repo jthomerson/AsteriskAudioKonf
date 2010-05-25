@@ -50,7 +50,9 @@ int conference_version( int fd, int argc, char *argv[] );
 
 int conference_restart( int fd, int argc, char *argv[] );
 
+#ifdef	APP_KONFERENCE_DEBUG
 int conference_debug( int fd, int argc, char *argv[] ) ;
+#endif
 
 int conference_list( int fd, int argc, char *argv[] ) ;
 int conference_kick( int fd, int argc, char *argv[] ) ;
@@ -113,7 +115,9 @@ char *conference_version(struct ast_cli_entry *, int, struct ast_cli_args *);
 
 char *conference_restart(struct ast_cli_entry *, int, struct ast_cli_args *);
 
+#ifdef	APP_KONFERENCE_DEBUG
 char *conference_debug(struct ast_cli_entry *, int, struct ast_cli_args *) ;
+#endif
 
 char *conference_list(struct ast_cli_entry *, int, struct ast_cli_args *) ;
 char *conference_kick(struct ast_cli_entry *, int, struct ast_cli_args *) ;
