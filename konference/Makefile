@@ -158,6 +158,7 @@ vad_test: vad_test.o libspeex/preprocess.o libspeex/misc.o libspeex/smallft.o
 	$(CC) $(PROFILE) -o $@ $^ -lm
 
 install:
+	$(INSTALL) -d $(INSTALL_MODULES_DIR)
 	$(INSTALL) -m 755 $(TARGET) $(INSTALL_MODULES_DIR)
 
 
