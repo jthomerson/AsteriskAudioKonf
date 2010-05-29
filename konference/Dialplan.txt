@@ -42,6 +42,9 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	'a' : V + T
 	'H' : play music on hold if only one member in conference
 	'w' : play music on hold for all members of the conference until a marked moderator (marked with 'M' flag) joins
+	'r' : record the conference.  it will be recorded to KONFERENCE_RECORDINGFILE with the format KONFERENCE_RECORDINGFORMAT
+		default for KONFERENCE_RECORDINGFILE is: konference-{conference-name}-{member-uniqueid}
+		default for KONFERENCE_RECORDINGFORMAT is: wav
 
 	Future development (these are not implemented yet):
 	?
