@@ -712,6 +712,8 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 	// initialize conference
 	//
 
+	conf->recfile = NULL;
+	conf->recformat = NULL;
 	conf->next = NULL ;
 	conf->prev = NULL ;
 	conf->memberlist = NULL ;
