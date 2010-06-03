@@ -527,9 +527,15 @@ static void conference_exec( struct ast_conference *conf )
 #endif
 				// send the notifications
 				send_state_change_notifications( conf->memberlist ) ;
-
+#ifdef  ONEMIXTHREAD
+				if ( !conf->next ) {
+					// increment the notification timer base
+					add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
+				}
+#else
 				// increment the notification timer base
 				add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
+#endif
 			}
 
 			// release conference lock
