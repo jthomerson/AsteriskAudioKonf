@@ -45,6 +45,8 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	'r' : record the conference.  it will be recorded to KONFERENCE_RECORDINGFILE with the format KONFERENCE_RECORDINGFORMAT
 		default for KONFERENCE_RECORDINGFILE is: konference-{conference-name}-{member-uniqueid}
 		default for KONFERENCE_RECORDINGFORMAT is: wav
+	'n' : do not create new conference, only join existing ones.
+		if conference does not exist KONFERENCE is set to NOTFOUND
 
 	Future development (these are not implemented yet):
 	?

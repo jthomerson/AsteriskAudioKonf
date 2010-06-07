@@ -105,6 +105,9 @@ struct ast_conf_member
 	// wait option flag
 	char wait_for_moderator_flag;
 
+	// creation of new conference not allowed
+	char no_create_flag;
+
 	// temp flag for when star is pressed
 	char star_pressed;
 

@@ -758,14 +758,13 @@ int member_exec( struct ast_channel* chan, void* data )
 	// setup a conference for the new member
 	//
 
-	char max_users_flag = 0 ;
-	conf = join_conference( member, &max_users_flag, recfile, recformat ) ;
+	conf = join_conference( member, recfile, recformat ) ;
 
 	if ( conf == NULL )
 	{
-		ast_log( LOG_NOTICE, "unable to setup member conference %s: max_users_flag is %d\n", member->conf_name, max_users_flag ) ;
+		ast_log( LOG_NOTICE, "unable to setup member conference %s\n", member->conf_name) ;
 		delete_member( member) ;
-		return (max_users_flag ? 0 : -1 ) ;
+		return -1;
 	}
 
 	//
@@ -1349,7 +1348,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		else
 #endif
 		{
-			// allowed flags are C, c, L, l, V, D, A, C, X, r, R, T, t, M, S, z, o, F, H
+			// allowed flags are C, c, L, l, V, D, A, C, X, r, R, T, t, M, S, z, o, F, H, n
 			// mute/no_recv options
 			switch ( flags[i] )
 			{
@@ -1404,6 +1403,9 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #endif
 			case 'M':
 				member->ismoderator = 1;
+				break;
+			case 'n':
+				member->no_create_flag = 1;
 				break;
 #ifdef	VIDEO
 			case 'N':

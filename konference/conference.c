@@ -620,7 +620,7 @@ void init_conference( void )
 	argument_delimiter = ( !strcmp(PACKAGE_VERSION,"1.4") ? "|" : "," ) ;
 }
 
-struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag, const char* recfile, const char *recformat )
+struct ast_conference* join_conference( struct ast_conf_member* member, const char* recfile, const char *recformat )
 {
 	struct ast_conference* conf = NULL ;
 
@@ -634,15 +634,25 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 	// unable to find an existing conference, try to create one
 	if ( conf == NULL )
 	{
-		// create a new conference
-		DEBUG("attempting to create requested conference\n") ;
+		if ( member->no_create_flag )
+		{
+			DEBUG("conference not found, and create of new conference not allowed\n") ;
+			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "NOTFOUND");
+		}
+		else
+		{
+			// create a new conference
+			DEBUG("attempting to create requested conference\n") ;
 
-		// create the new conference with one member
-		conf = create_conf( member->conf_name, member ) ;
+			// create the new conference with one member
+			conf = create_conf( member->conf_name, member ) ;
 
-		// return an error if create_conf() failed
-		if ( conf == NULL )
-			ast_log( LOG_ERROR, "unable to find or create requested conference\n" ) ;
+			// return an error if create_conf() failed
+			if ( conf == NULL ) {
+				ast_log( LOG_ERROR, "unable to find or create requested conference\n" ) ;
+				pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "NORESOURCES");
+			}
+		}
 	}
 	else
 	{
@@ -656,7 +666,6 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 			add_member( member, conf ) ;
 		} else {
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "MAXUSERS");
-			*max_users_flag = 1;
 			conf = NULL;
 		}
 	}

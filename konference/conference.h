@@ -157,7 +157,7 @@ int hash( const char *channel_name ) ;
 
 int count_exec( struct ast_channel* chan, void* data ) ;
 
-struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag, const char* recfile, const char* recformat ) ;
+struct ast_conference* join_conference( struct ast_conf_member* member, const char* recfile, const char* recformat ) ;
 
 int end_conference( const char *name, int hangup ) ;
 
