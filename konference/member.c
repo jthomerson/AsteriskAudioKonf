@@ -978,6 +978,35 @@ struct ast_conf_member *check_active_video( int id, struct ast_conference *conf 
      return NULL;
 }
 #endif
+
+static int convert_format_to_index(int format)
+{
+	switch ( format )
+	{
+	case AST_CONF_FORMAT:
+		return AC_SLINEAR_INDEX;
+	case AST_FORMAT_ULAW:
+		return AC_ULAW_INDEX;
+	case AST_FORMAT_ALAW:
+		return AC_ALAW_INDEX;
+	case AST_FORMAT_GSM:
+		return AC_GSM_INDEX;
+	case AST_FORMAT_SPEEX:
+		return AC_SPEEX_INDEX;
+#ifdef AC_USE_G729A
+	case AST_FORMAT_G729A:
+		return AC_G729A_INDEX;
+#endif
+#ifdef AC_USE_G722
+	case AST_FORMAT_G722:
+		return AC_G722_INDEX;
+#endif
+	default:
+		break;
+	}
+	return 0;
+}
+
 //
 // manange member functions
 //
@@ -1501,80 +1530,8 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->from_slinear = ast_translator_build_path( member->write_format, AST_CONF_FORMAT ) ;
 
 	// index for converted_frames array
-	switch ( member->write_format )
-	{
-		case AST_CONF_FORMAT:
-			member->write_format_index = AC_SLINEAR_INDEX ;
-			break ;
-
-		case AST_FORMAT_ULAW:
-			member->write_format_index = AC_ULAW_INDEX ;
-			break ;
-
-	        case AST_FORMAT_ALAW:
-			member->write_format_index = AC_ALAW_INDEX ;
-			break ;
-
-		case AST_FORMAT_GSM:
-			member->write_format_index = AC_GSM_INDEX ;
-			break ;
-
-		case AST_FORMAT_SPEEX:
-			member->write_format_index = AC_SPEEX_INDEX;
-			break;
-
-#ifdef AC_USE_G729A
-		case AST_FORMAT_G729A:
-			member->write_format_index = AC_G729A_INDEX;
-			break;
-#endif
-#ifdef AC_USE_G722
-		case AST_FORMAT_G722:
-			member->write_format_index = AC_G722_INDEX;
-			break;
-#endif
-
-		default:
-			member->write_format_index = 0 ;
-	}
-
-	// index for converted_frames array
-	switch ( member->read_format )
-	{
-		case AST_CONF_FORMAT:
-			member->read_format_index = AC_SLINEAR_INDEX ;
-			break ;
-
-		case AST_FORMAT_ULAW:
-			member->read_format_index = AC_ULAW_INDEX ;
-			break ;
-
-		case AST_FORMAT_ALAW:
-			member->read_format_index = AC_ALAW_INDEX ;
-			break ;
-
-		case AST_FORMAT_GSM:
-			member->read_format_index = AC_GSM_INDEX ;
-			break ;
-
-		case AST_FORMAT_SPEEX:
-			member->read_format_index = AC_SPEEX_INDEX;
-			break;
-
-#ifdef AC_USE_G729A
-		case AST_FORMAT_G729A:
-			member->read_format_index = AC_G729A_INDEX;
-			break;
-#endif
-#ifdef AC_USE_G722
-		case AST_FORMAT_G722:
-			member->read_format_index = AC_G722_INDEX;
-			break;
-#endif
-
-		default:
-			member->read_format_index = 0 ;
-	}
+	member->write_format_index = convert_format_to_index( member->write_format );
+	member->read_format_index = convert_format_to_index( member->read_format );
 
 	// smoother defaults.
 	member->smooth_multiple =1;
