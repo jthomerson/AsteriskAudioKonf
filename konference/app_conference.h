@@ -94,53 +94,21 @@
 // #define DEBUG_OUTPUT_PCM
 
 //
-// !!! THESE CONSTANTS SHOULD BE CLEANED UP AND CLARIFIED !!!
+// Defines related to the audio format in which the mixing happens.
+// (Signed, 16-bit linear, 8 kHz or 16 kHz)
 //
-
-//
-// sample information for AST_FORMAT_SLINEAR format
-//
-
 #ifndef	AC_USE_G722
-#define AST_CONF_SAMPLE_RATE 8000
+#define AST_CONF_SAMPLE_RATE		8000	/* Hz */
+#define AST_CONF_FORMAT			AST_FORMAT_SLINEAR
 #else
-#define AST_CONF_SAMPLE_RATE 16000
+#define AST_CONF_SAMPLE_RATE		16000	/* Hz */
+#define AST_CONF_FORMAT			AST_FORMAT_SLINEAR16
 #endif
-#define AST_CONF_SAMPLE_SIZE 16
-#define AST_CONF_FRAME_INTERVAL 20
-//neils#define AST_CONF_FRAME_INTERVAL 30
+#define AST_CONF_FRAME_INTERVAL		20	/* ms */
 
-//
-// so, since we cycle approximately every 20ms,
-// we can compute the following values:
-//
-// 160 samples per 20 ms frame -or-
-// ( 8000 samples-per-second * ( 20 ms / 1000 ms-per-second ) ) = 160 samples
-//
-// 320 bytes ( 2560 bits ) of data  20 ms frame -or-
-// ( 160 samples * 16 bits-per-sample / 8 bits-per-byte ) = 320 bytes
-//
-
-#ifndef	AC_USE_G722
-// 160 samples 16-bit signed linear
-#define AST_CONF_BLOCK_SAMPLES 160
-#else
-#define AST_CONF_BLOCK_SAMPLES 320
-#endif
-
-// 2 bytes per sample ( i.e. 16-bit )
-#define AST_CONF_BYTES_PER_SAMPLE 2
-
-#ifndef	AC_USE_G722
-// 320 bytes for each 160 sample frame of 16-bit audio
-#define AST_CONF_FRAME_DATA_SIZE 320
-#else
-#define AST_CONF_FRAME_DATA_SIZE 640
-#endif
-
-// 1000 ms-per-second / 20 ms-per-frame = 50 frames-per-second
-#define AST_CONF_FRAMES_PER_SECOND ( 1000 / AST_CONF_FRAME_INTERVAL )
-
+#define AST_CONF_BLOCK_SAMPLES		(AST_CONF_SAMPLE_RATE * AST_CONF_FRAME_INTERVAL / 1000)
+#define AST_CONF_FRAME_DATA_SIZE	(AST_CONF_BLOCK_SAMPLES * 2)
+#define AST_CONF_FRAMES_PER_SECOND	(1000 / AST_CONF_FRAME_INTERVAL)
 
 //
 // buffer and queue values

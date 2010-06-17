@@ -383,11 +383,7 @@ struct ast_frame* convert_frame_to_slinear( struct ast_trans_pvt* trans, struct 
 	// we don't need to duplicate this frame since
 	// the normal translation would free it anyway, so
 	// we'll just pretend we free'd and malloc'd a new one.
-#ifndef	AC_USE_G722
-	if ( fr->subclass == AST_FORMAT_SLINEAR )
-#else
-	if ( fr->subclass == AST_FORMAT_SLINEAR16 )
-#endif
+	if ( fr->subclass == AST_CONF_FORMAT )
 		return fr ;
 
 	// check for null translator ( after we've checked that we need to translate )
@@ -418,11 +414,7 @@ struct ast_frame* convert_frame_from_slinear( struct ast_trans_pvt* trans, struc
 	}
 
 	// if the frame is not slinear, return an error
-#ifndef	AC_USE_G722
-	if ( fr->subclass != AST_FORMAT_SLINEAR )
-#else
-	if ( fr->subclass != AST_FORMAT_SLINEAR16 )
-#endif
+	if ( fr->subclass != AST_CONF_FORMAT )
 	{
 		ast_log( LOG_ERROR, "unable to translate non-slinear frame\n" ) ;
 		return NULL ;
@@ -634,11 +626,7 @@ struct ast_frame* create_slinear_frame( char* data )
 	}
 
 	f->frametype = AST_FRAME_VOICE ;
-#ifndef	AC_USE_G722
-	f->subclass = AST_FORMAT_SLINEAR ;
-#else
-	f->subclass = AST_FORMAT_SLINEAR16 ;
-#endif
+	f->subclass = AST_CONF_FORMAT ;
 	f->samples = AST_CONF_BLOCK_SAMPLES ;
 	f->offset = AST_FRIENDLY_OFFSET ;
 	f->mallocd = AST_MALLOCD_HDR | AST_MALLOCD_DATA ;
