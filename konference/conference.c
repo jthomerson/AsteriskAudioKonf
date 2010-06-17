@@ -774,6 +774,9 @@ static struct ast_conference* create_conf( char* name, struct ast_conf_member* m
 #ifdef AC_USE_G722
 	conf->from_slinear_paths[ AC_G722_INDEX ] = ast_translator_build_path( AST_FORMAT_G722, AST_CONF_FORMAT) ;
 #endif
+#ifdef AC_USE_SPEEX16
+	conf->from_slinear_paths[ AC_SPEEX16_INDEX ] = ast_translator_build_path( AST_FORMAT_SPEEX16, AST_CONF_FORMAT) ;
+#endif
 
 	//
 	// spawn thread for new conference, using conference_exec( conf )

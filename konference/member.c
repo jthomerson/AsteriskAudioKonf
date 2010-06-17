@@ -1001,6 +1001,10 @@ static int convert_format_to_index(int format)
 	case AST_FORMAT_G722:
 		return AC_G722_INDEX;
 #endif
+#ifdef AC_USE_SPEEX16
+	case AST_FORMAT_SPEEX16:
+		return AC_SPEEX16_INDEX;
+#endif
 	default:
 		break;
 	}

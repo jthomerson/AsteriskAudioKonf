@@ -97,12 +97,12 @@
 // Defines related to the audio format in which the mixing happens.
 // (Signed, 16-bit linear, 8 kHz or 16 kHz)
 //
-#ifndef	AC_USE_G722
-#define AST_CONF_SAMPLE_RATE		8000	/* Hz */
-#define AST_CONF_FORMAT			AST_FORMAT_SLINEAR
-#else
+#if defined(AC_USE_G722) || defined(AC_USE_SPEEX16)
 #define AST_CONF_SAMPLE_RATE		16000	/* Hz */
 #define AST_CONF_FORMAT			AST_FORMAT_SLINEAR16
+#else
+#define AST_CONF_SAMPLE_RATE		8000	/* Hz */
+#define AST_CONF_FORMAT			AST_FORMAT_SLINEAR
 #endif
 #define AST_CONF_FRAME_INTERVAL		20	/* ms */
 
@@ -203,6 +203,9 @@
 #endif
 #ifdef	AC_USE_G722
 		AC_G722_INDEX,
+#endif
+#ifdef	AC_USE_SPEEX16
+		AC_SPEEX16_INDEX,
 #endif
 		AC_SUPPORTED_FORMATS
 		} ;

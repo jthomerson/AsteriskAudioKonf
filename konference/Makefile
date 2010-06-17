@@ -95,6 +95,11 @@ CPPFLAGS += -DONEMIXTHREAD
 #
 # CPPFLAGS += -DAC_USE_G722
 
+#
+# Uncomment this if you want Speex Wideband support (requires asterisk 1.8 or backport patch)
+#
+# CPPFLAGS += -DAC_USE_SPEEX16
+
 ifeq ($(APP_KONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_KONFERENCE_DEBUG
 endif
