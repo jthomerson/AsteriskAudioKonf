@@ -1,0 +1,9 @@
+asterisk-1.6.2.5-speex16.patch		(Timo Teras)
+	This is a patch for adding Speex wideband support to 
+	1.6.2.5 of Asterisk.  This patch replaces the LPC10 codec with Speex 
+	Wideband. The reason is that LPC10 is not so good quality and it's not
+	supported by AsteriskAudioKonf anyway. So this patch will break IAX
+	protocol compatibility with LPC10; so if IAX happens to be enabled, do
+	not enable LPC10 nor Wideband: they won't work properly. For SIP 
+	SpeexWB should work just fine.
+

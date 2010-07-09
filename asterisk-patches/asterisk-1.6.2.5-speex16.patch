@@ -1,0 +1,694 @@
+Index: asterisk-1.6.2.5/codecs/codec_speex.c
+===================================================================
+--- asterisk-1.6.2.5.orig/codecs/codec_speex.c	2010-06-19 10:41:18.000000000 +0300
++++ asterisk-1.6.2.5/codecs/codec_speex.c	2010-06-19 20:12:04.000000000 +0300
+@@ -97,12 +97,11 @@
+ #endif
+ };
+ 
+-
+-static int lintospeex_new(struct ast_trans_pvt *pvt)
++static int speex_encoder_construct(struct ast_trans_pvt *pvt, const SpeexMode *profile, int sampling_rate)
+ {
+ 	struct speex_coder_pvt *tmp = pvt->pvt;
+ 
+-	if (!(tmp->speex = speex_encoder_init(&speex_nb_mode)))
++	if (!(tmp->speex = speex_encoder_init(profile)))
+ 		return -1;
+ 
+ 	speex_bits_init(&tmp->bits);
+@@ -111,7 +110,7 @@
+ 	speex_encoder_ctl(tmp->speex, SPEEX_SET_COMPLEXITY, &complexity);
+ #ifdef _SPEEX_TYPES_H
+ 	if (preproc) {
+-		tmp->pp = speex_preprocess_state_init(tmp->framesize, 8000); /* XXX what is this 8000 ? */
++		tmp->pp = speex_preprocess_state_init(tmp->framesize, sampling_rate);
+ 		speex_preprocess_ctl(tmp->pp, SPEEX_PREPROCESS_SET_VAD, &pp_vad);
+ 		speex_preprocess_ctl(tmp->pp, SPEEX_PREPROCESS_SET_AGC, &pp_agc);
+ 		speex_preprocess_ctl(tmp->pp, SPEEX_PREPROCESS_SET_AGC_LEVEL, &pp_agc_level);
+@@ -139,11 +138,21 @@
+ 	return 0;
+ }
+ 
+-static int speextolin_new(struct ast_trans_pvt *pvt)
++static int lintospeex_new(struct ast_trans_pvt *pvt)
++{
++	return speex_encoder_construct(pvt, &speex_nb_mode, 8000);
++}
++
++static int lin16tospeexwb_new(struct ast_trans_pvt *pvt)
++{
++	return speex_encoder_construct(pvt, &speex_wb_mode, 16000);
++}
++
++static int speex_decoder_construct(struct ast_trans_pvt *pvt, const SpeexMode *profile)
+ {
+ 	struct speex_coder_pvt *tmp = pvt->pvt;
+ 	
+-	if (!(tmp->speex = speex_decoder_init(&speex_nb_mode)))
++	if (!(tmp->speex = speex_decoder_init(profile)))
+ 		return -1;
+ 
+ 	speex_bits_init(&tmp->bits);
+@@ -154,6 +163,16 @@
+ 	return 0;
+ }
+ 
++static int speextolin_new(struct ast_trans_pvt *pvt)
++{
++	return speex_decoder_construct(pvt, &speex_nb_mode);
++}
++
++static int speexwbtolin16_new(struct ast_trans_pvt *pvt)
++{
++	return speex_decoder_construct(pvt, &speex_wb_mode);
++}
++
+ /*! \brief convert and store into outbuf */
+ static int speextolin_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
+ {
+@@ -337,6 +356,34 @@
+ 	.buf_size = BUFFER_SAMPLES * 2, /* XXX maybe a lot less ? */
+ };
+ 
++static struct ast_translator speexwbtolin16 = {
++	.name = "speexwbtolin16",
++	.srcfmt = AST_FORMAT_SPEEX16,
++	.dstfmt =  AST_FORMAT_SLINEAR16,
++	.newpvt = speexwbtolin16_new,
++	.framein = speextolin_framein,
++	.destroy = speextolin_destroy,
++	.sample = speex16_sample,
++	.desc_size = sizeof(struct speex_coder_pvt),
++	.buffer_samples = BUFFER_SAMPLES,
++	.buf_size = BUFFER_SAMPLES * 2,
++	.native_plc = 1,
++};
++
++static struct ast_translator lin16tospeexwb = {
++	.name = "lin16tospeexwb",
++	.srcfmt = AST_FORMAT_SLINEAR16,
++	.dstfmt = AST_FORMAT_SPEEX16,
++	.newpvt = lin16tospeexwb_new,
++	.framein = lintospeex_framein,
++	.frameout = lintospeex_frameout,
++	.destroy = lintospeex_destroy,
++	.sample = slin16_sample,
++	.desc_size = sizeof(struct speex_coder_pvt),
++	.buffer_samples = BUFFER_SAMPLES,
++	.buf_size = BUFFER_SAMPLES * 2, /* XXX maybe a lot less ? */
++};
++
+ static int parse_config(int reload) 
+ {
+ 	struct ast_flags config_flags = { reload ? CONFIG_FLAG_FILEUNCHANGED : 0 };
+@@ -441,28 +488,29 @@
+ 
+ static int unload_module(void)
+ {
+-	int res;
++	int res = 0;
+ 
+-	res = ast_unregister_translator(&lintospeex);
+ 	res |= ast_unregister_translator(&speextolin);
++	res |= ast_unregister_translator(&lintospeex);
++	res |= ast_unregister_translator(&speexwbtolin16);
++	res |= ast_unregister_translator(&lin16tospeexwb);
+ 
+ 	return res;
+ }
+ 
+ static int load_module(void)
+ {
+-	int res;
++	int res = 0;
+ 
+ 	if (parse_config(0))
+ 		return AST_MODULE_LOAD_DECLINE;
+-	res=ast_register_translator(&speextolin);
+-	if (!res) 
+-		res=ast_register_translator(&lintospeex);
+-	else
+-		ast_unregister_translator(&speextolin);
+-	if (res)
+-		return AST_MODULE_LOAD_FAILURE;
+-	return AST_MODULE_LOAD_SUCCESS;
++
++	res |= ast_register_translator(&speextolin);
++	res |= ast_register_translator(&lintospeex);
++	res |= ast_register_translator(&speexwbtolin16);
++	res |= ast_register_translator(&lin16tospeexwb);
++
++	return res;
+ }
+ 
+ AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Speex Coder/Decoder",
+Index: asterisk-1.6.2.5/include/asterisk/frame.h
+===================================================================
+--- asterisk-1.6.2.5.orig/include/asterisk/frame.h	2010-06-19 10:41:18.000000000 +0300
++++ asterisk-1.6.2.5/include/asterisk/frame.h	2010-06-19 11:16:03.000000000 +0300
+@@ -252,7 +252,9 @@
+ /*! Raw 16-bit Signed Linear (8000 Hz) PCM */
+ #define AST_FORMAT_SLINEAR	(1 << 6)
+ /*! LPC10, 180 samples/frame */
+-#define AST_FORMAT_LPC10	(1 << 7)
++/* #define AST_FORMAT_LPC10	(1 << 7) */
++/*! SpeeX Wideband (16 kHz) Free Compression */
++#define AST_FORMAT_SPEEX16	(1 << 7)
+ /*! G.729A audio */
+ #define AST_FORMAT_G729A	(1 << 8)
+ /*! SpeeX Free Compression */
+@@ -292,7 +294,7 @@
+ #define AST_FORMAT_T140		(1 << 27)
+ /*! Maximum text mask */
+ #define AST_FORMAT_MAX_TEXT	(1 << 28))
+-#define AST_FORMAT_TEXT_MASK   (((1 << 30)-1) & ~(AST_FORMAT_AUDIO_MASK) & ~(AST_FORMAT_VIDEO_MASK))
++#define AST_FORMAT_TEXT_MASK   (((1 << 29)-1) & ~(AST_FORMAT_AUDIO_MASK) & ~(AST_FORMAT_VIDEO_MASK))
+ 
+ enum ast_control_frame_type {
+ 	AST_CONTROL_HANGUP = 1,		/*!< Other end has hungup */
+@@ -683,6 +685,7 @@
+ 	case AST_FORMAT_G722:
+ 	case AST_FORMAT_SLINEAR16:
+ 	case AST_FORMAT_SIREN7:
++	case AST_FORMAT_SPEEX16:
+ 		return 16000;
+ 	case AST_FORMAT_SIREN14:
+ 		return 32000;
+Index: asterisk-1.6.2.5/main/channel.c
+===================================================================
+--- asterisk-1.6.2.5.orig/main/channel.c	2010-06-19 10:41:18.000000000 +0300
++++ asterisk-1.6.2.5/main/channel.c	2010-06-19 11:17:08.000000000 +0300
+@@ -737,10 +737,11 @@
+ 		/*! iLBC is not too bad */
+ 		AST_FORMAT_ILBC,
+ 		/*! Speex is free, but computationally more expensive than GSM */
++		AST_FORMAT_SPEEX16,
+ 		AST_FORMAT_SPEEX,
+ 		/*! Ick, LPC10 sounds terrible, but at least we have code for it, if you're tacky enough
+ 		    to use it */
+-		AST_FORMAT_LPC10,
++		/* AST_FORMAT_LPC10, */
+ 		/*! G.729a is faster than 723 and slightly less expensive */
+ 		AST_FORMAT_G729A,
+ 		/*! Down to G.723.1 which is proprietary but at least designed for voice */
+Index: asterisk-1.6.2.5/main/frame.c
+===================================================================
+--- asterisk-1.6.2.5.orig/main/frame.c	2010-06-19 10:41:18.000000000 +0300
++++ asterisk-1.6.2.5/main/frame.c	2010-06-19 11:17:35.000000000 +0300
+@@ -101,9 +101,10 @@
+ 	{ AST_FORMAT_G726, "g726", 8000, "G.726 RFC3551", 40, 10, 300, 10, 20 },                               /*!< codec_g726.c */
+ 	{ AST_FORMAT_ADPCM, "adpcm" , 8000, "ADPCM", 40, 10, 300, 10, 20 },                                    /*!< codec_adpcm.c */
+ 	{ AST_FORMAT_SLINEAR, "slin", 8000, "16 bit Signed Linear PCM", 160, 10, 70, 10, 20, AST_SMOOTHER_FLAG_BE }, /*!< Signed linear */
+-	{ AST_FORMAT_LPC10, "lpc10", 8000, "LPC10", 7, 20, 20, 20, 20 },                                       /*!< codec_lpc10.c */ 
++	/* { AST_FORMAT_LPC10, "lpc10", 8000, "LPC10", 7, 20, 20, 20, 20 },                                       /*!< codec_lpc10.c */
+ 	{ AST_FORMAT_G729A, "g729", 8000, "G.729A", 10, 10, 230, 10, 20, AST_SMOOTHER_FLAG_G729 },             /*!< Binary commercial distribution */
+ 	{ AST_FORMAT_SPEEX, "speex", 8000, "SpeeX", 10, 10, 60, 10, 20 },                                      /*!< codec_speex.c */
++	{ AST_FORMAT_SPEEX16, "speex16", 16000, "SpeeX 16khz", 10, 10, 60, 10, 20 },                          /*!< codec_speex.c */
+ 	{ AST_FORMAT_ILBC, "ilbc", 8000, "iLBC", 50, 30, 30, 30, 30 },                                         /*!< codec_ilbc.c */ /* inc=30ms - workaround */
+ 	{ AST_FORMAT_G726_AAL2, "g726aal2", 8000, "G.726 AAL2", 40, 10, 300, 10, 20 },                         /*!< codec_g726.c */
+ 	{ AST_FORMAT_G722, "g722", 16000, "G722", 80, 10, 150, 10, 20 },                                       /*!< codec_g722.c */
+@@ -1335,8 +1336,8 @@
+ 
+ static int speex_get_wb_sz_at(unsigned char *data, int len, int bit)
+ {
+-	static int SpeexWBSubModeSz[] = {
+-		0, 36, 112, 192,
++	static const int SpeexWBSubModeSz[] = {
++		4, 36, 112, 192,
+ 		352, 0, 0, 0 };
+ 	int off = bit;
+ 	unsigned char c;
+@@ -1365,12 +1366,12 @@
+ 
+ static int speex_samples(unsigned char *data, int len)
+ {
+-	static int SpeexSubModeSz[] = {
++	static const int SpeexSubModeSz[] = {
+ 		5, 43, 119, 160,
+ 		220, 300, 364, 492, 
+ 		79, 0, 0, 0,
+ 		0, 0, 0, 0 };
+-	static int SpeexInBandSz[] = { 
++	static const int SpeexInBandSz[] = {
+ 		1, 1, 4, 4,
+ 		4, 4, 4, 4,
+ 		8, 8, 16, 16,
+@@ -1389,10 +1390,8 @@
+ 		}
+ 		bit += off;
+ 
+-		if ((len * 8 - bit) < 5) {
+-			ast_log(LOG_WARNING, "Not enough bits remaining after wide band for speex samples.\n");
++		if ((len * 8 - bit) < 5)
+ 			break;
+-		}
+ 
+ 		/* get control bits */
+ 		c = get_n_bits_at(data, 5, bit);
+@@ -1407,12 +1406,14 @@
+ 			bit += 4;
+ 			bit += SpeexInBandSz[c];
+ 		} else if (c == 13) {
+-			/* user in-band; next 5 bits contain msg len */
+-			c = get_n_bits_at(data, 5, bit);
+-			bit += 5;
+-			bit += c * 8;
++			/* user in-band; next 4 bits contain msg len */
++			c = get_n_bits_at(data, 4, bit);
++			bit += 4;
++			/* after which it's 5-bit signal id + c bytes of data */
++			bit += 5 + c * 8;
+ 		} else if (c > 8) {
+ 			/* unknown */
++			ast_log(LOG_WARNING, "Unknown speex control frame %d\n", c);
+ 			break;
+ 		} else {
+ 			/* skip number bits for submode (less the 5 control bits) */
+@@ -1431,6 +1432,9 @@
+ 	case AST_FORMAT_SPEEX:
+ 		samples = speex_samples(f->data.ptr, f->datalen);
+ 		break;
++	case AST_FORMAT_SPEEX16:
++		samples = 2 * speex_samples(f->data.ptr, f->datalen);
++		break;
+ 	case AST_FORMAT_G723_1:
+ 		samples = g723_samples(f->data.ptr, f->datalen);
+ 		break;
+@@ -1447,11 +1451,13 @@
+ 	case AST_FORMAT_SLINEAR16:
+ 		samples = f->datalen / 2;
+ 		break;
++#if 0
+ 	case AST_FORMAT_LPC10:
+ 		/* assumes that the RTP packet contains one LPC10 frame */
+ 		samples = 22 * 8;
+ 		samples += (((char *)(f->data.ptr))[7] & 0x1) * 8;
+ 		break;
++#endif
+ 	case AST_FORMAT_ULAW:
+ 	case AST_FORMAT_ALAW:
+ 		samples = f->datalen;
+Index: asterisk-1.6.2.5/main/rtp.c
+===================================================================
+--- asterisk-1.6.2.5.orig/main/rtp.c	2010-06-19 10:41:18.000000000 +0300
++++ asterisk-1.6.2.5/main/rtp.c	2010-06-19 11:16:34.000000000 +0300
+@@ -1929,11 +1929,12 @@
+ 	{{1, AST_FORMAT_G726}, "audio", "G726-32", 8000},
+ 	{{1, AST_FORMAT_ADPCM}, "audio", "DVI4", 8000},
+ 	{{1, AST_FORMAT_SLINEAR}, "audio", "L16", 8000},
+-	{{1, AST_FORMAT_LPC10}, "audio", "LPC", 8000},
++	/* {{1, AST_FORMAT_LPC10}, "audio", "LPC", 8000}, */
+ 	{{1, AST_FORMAT_G729A}, "audio", "G729", 8000},
+ 	{{1, AST_FORMAT_G729A}, "audio", "G729A", 8000},
+ 	{{1, AST_FORMAT_G729A}, "audio", "G.729", 8000},
+ 	{{1, AST_FORMAT_SPEEX}, "audio", "speex", 8000},
++	{{1, AST_FORMAT_SPEEX16}, "audio", "speex", 16000},
+ 	{{1, AST_FORMAT_ILBC}, "audio", "iLBC", 8000},
+ 	/* this is the sample rate listed in the RTP profile for the G.722
+ 	   codec, *NOT* the actual sample rate of the media stream
+@@ -1975,7 +1976,7 @@
+ 	[4] = {1, AST_FORMAT_G723_1},
+ 	[5] = {1, AST_FORMAT_ADPCM}, /* 8 kHz */
+ 	[6] = {1, AST_FORMAT_ADPCM}, /* 16 kHz */
+-	[7] = {1, AST_FORMAT_LPC10},
++	/* [7] = {1, AST_FORMAT_LPC10}, */
+ 	[8] = {1, AST_FORMAT_ALAW},
+ 	[9] = {1, AST_FORMAT_G722},
+ 	[10] = {1, AST_FORMAT_SLINEAR}, /* 2 channels */
+@@ -2001,6 +2002,7 @@
+ 	[111] = {1, AST_FORMAT_G726},
+ 	[112] = {1, AST_FORMAT_G726_AAL2},
+ 	[115] = {1, AST_FORMAT_SIREN14},
++	[117] = {1, AST_FORMAT_SPEEX16},
+ 	[121] = {0, AST_RTP_CISCO_DTMF}, /* Must be type 121 */
+ };
+ 
+@@ -3853,6 +3855,7 @@
+ 
+ 		switch (subclass) {
+ 		case AST_FORMAT_SPEEX:
++		case AST_FORMAT_SPEEX16:
+ 		case AST_FORMAT_G723_1:
+ 		case AST_FORMAT_SIREN7:
+ 		case AST_FORMAT_SIREN14:
+Index: asterisk-1.6.2.5/menuselect-tree
+===================================================================
+--- asterisk-1.6.2.5.orig/menuselect-tree	2010-06-19 11:20:06.000000000 +0300
++++ asterisk-1.6.2.5/menuselect-tree	2010-06-19 20:12:55.000000000 +0300
+@@ -310,8 +310,6 @@
+ <member name="codec_ilbc" displayname="iLBC Coder/Decoder" remove_on_change="codecs/codec_ilbc.o codecs/codec_ilbc.so">
+ 	<defaultenabled>no</defaultenabled>
+ </member>
+-<member name="codec_lpc10" displayname="LPC10 2.4kbps Coder/Decoder" remove_on_change="codecs/codec_lpc10.o codecs/codec_lpc10.so">
+-</member>
+ <member name="codec_resample" displayname="SLIN Resampling Codec" remove_on_change="codecs/codec_resample.o codecs/codec_resample.so">
+ 	<depend>resample</depend>
+ </member>
+Index: asterisk-1.6.2.5/codecs/Makefile
+===================================================================
+--- asterisk-1.6.2.5.orig/codecs/Makefile	2010-06-19 11:31:16.000000000 +0300
++++ asterisk-1.6.2.5/codecs/Makefile	2010-06-19 11:35:04.000000000 +0300
+@@ -13,6 +13,7 @@
+ 
+ -include $(ASTTOPDIR)/menuselect.makeopts $(ASTTOPDIR)/menuselect.makedeps
+ 
++MODULE_EXCLUDE=codec_lpc10
+ MODULE_PREFIX=codec
+ MENUSELECT_CATEGORY=CODECS
+ MENUSELECT_DESCRIPTION=Codec Translators
+Index: asterisk-1.6.2.5/codecs/codec_lpc10.c
+===================================================================
+--- asterisk-1.6.2.5.orig/codecs/codec_lpc10.c	2010-06-19 11:38:47.000000000 +0300
++++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+@@ -1,278 +0,0 @@
+-/*
+- * Asterisk -- An open source telephony toolkit.
+- *
+- * Copyright (C) 1999 - 2005, Digium, Inc.
+- *
+- * Mark Spencer <markster@digium.com>
+- *
+- * The lpc10 code is from a library used by nautilus, modified to be a bit
+- * nicer to the compiler.
+- * See http://www.arl.wustl.edu/~jaf/ 
+- *
+- * See http://www.asterisk.org for more information about
+- * the Asterisk project. Please do not directly contact
+- * any of the maintainers of this project for assistance;
+- * the project provides a web site, mailing lists and IRC
+- * channels for your use.
+- *
+- * This program is free software, distributed under the terms of
+- * the GNU General Public License Version 2. See the LICENSE file
+- * at the top of the source tree.
+- */
+-
+-/*! \file
+- *
+- * \brief Translate between signed linear and LPC10 (Linear Predictor Code)
+- *
+- * \ingroup codecs
+- */
+-
+-#include "asterisk.h"
+-
+-ASTERISK_FILE_VERSION(__FILE__, "$Revision: 150729 $")
+-
+-#include "asterisk/translate.h"
+-#include "asterisk/config.h"
+-#include "asterisk/module.h"
+-#include "asterisk/utils.h"
+-
+-#include "lpc10/lpc10.h"
+-
+-/* Sample frame data */
+-#include "asterisk/slin.h"
+-#include "ex_lpc10.h"
+-
+-/* We use a very strange format here...  I have no idea why...  The frames are 180
+-   samples long, which isn't even an even number of milliseconds...  Not only that
+-   but we hvae to waste two bits of each frame to keep them ending on a byte boundary
+-   because the frames are 54 bits long */
+-
+-#define LPC10_BYTES_IN_COMPRESSED_FRAME (LPC10_BITS_IN_COMPRESSED_FRAME + 7)/8
+-
+-#define	BUFFER_SAMPLES	8000
+-
+-struct lpc10_coder_pvt {
+-	union {
+-		struct lpc10_encoder_state *enc;
+-		struct lpc10_decoder_state *dec;
+-	} lpc10;
+-	/* Enough to store a full second */
+-	short buf[BUFFER_SAMPLES];
+-	int longer;
+-};
+-
+-static int lpc10_enc_new(struct ast_trans_pvt *pvt)
+-{
+-	struct lpc10_coder_pvt *tmp = pvt->pvt;
+-
+-	return (tmp->lpc10.enc = create_lpc10_encoder_state()) ? 0 : -1;
+-}
+-
+-static int lpc10_dec_new(struct ast_trans_pvt *pvt)
+-{
+-	struct lpc10_coder_pvt *tmp = pvt->pvt;
+-
+-	return (tmp->lpc10.dec = create_lpc10_decoder_state()) ? 0 : -1;
+-}
+-
+-static void extract_bits(INT32 *bits, unsigned char *c)
+-{
+-	int x;
+-	for (x=0;x<LPC10_BITS_IN_COMPRESSED_FRAME;x++) {
+-		if (*c & (0x80 >> (x & 7)))
+-			bits[x] = 1;
+-		else
+-			bits[x] = 0;
+-		if ((x & 7) == 7)
+-			c++;
+-	}
+-}
+-
+-/* XXX note lpc10_encode() produces one bit per word in bits[] */
+-static void build_bits(unsigned char *c, INT32 *bits)
+-{
+-	unsigned char mask=0x80;
+-	int x;
+-	*c = 0;
+-	for (x=0;x<LPC10_BITS_IN_COMPRESSED_FRAME;x++) {
+-		if (bits[x])
+-			*c |= mask;
+-		mask = mask >> 1;
+-		if ((x % 8)==7) {
+-			c++;
+-			*c = 0;
+-			mask = 0x80;
+-		}
+-	}
+-}
+-
+-static int lpc10tolin_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
+-{
+-	struct lpc10_coder_pvt *tmp = pvt->pvt;
+-	int16_t *dst = pvt->outbuf.i16;
+-	int len = 0;
+-
+-	while (len + LPC10_BYTES_IN_COMPRESSED_FRAME <= f->datalen) {
+-		int x;
+-		float tmpbuf[LPC10_SAMPLES_PER_FRAME];
+-		INT32 bits[LPC10_BITS_IN_COMPRESSED_FRAME]; /* XXX see note */
+-		if (pvt->samples + LPC10_SAMPLES_PER_FRAME > BUFFER_SAMPLES) {
+-			ast_log(LOG_WARNING, "Out of buffer space\n");
+-			return -1;
+-		}
+-		extract_bits(bits, f->data.ptr + len);
+-		if (lpc10_decode(bits, tmpbuf, tmp->lpc10.dec)) {
+-			ast_log(LOG_WARNING, "Invalid lpc10 data\n");
+-			return -1;
+-		}
+-		for (x=0;x<LPC10_SAMPLES_PER_FRAME;x++) {
+-			/* Convert to a short between -1.0 and 1.0 */
+-			dst[pvt->samples + x] = (int16_t)(32768.0 * tmpbuf[x]);
+-		}
+-
+-		pvt->samples += LPC10_SAMPLES_PER_FRAME;
+-		pvt->datalen += 2*LPC10_SAMPLES_PER_FRAME;
+-		len += LPC10_BYTES_IN_COMPRESSED_FRAME;
+-	}
+-	if (len != f->datalen) 
+-		printf("Decoded %d, expected %d\n", len, f->datalen);
+-	return 0;
+-}
+-
+-static int lintolpc10_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
+-{
+-	struct lpc10_coder_pvt *tmp = pvt->pvt;
+-
+-	/* Just add the frames to our stream */
+-	if (pvt->samples + f->samples > BUFFER_SAMPLES) {
+-		ast_log(LOG_WARNING, "Out of buffer space\n");
+-		return -1;
+-	}
+-	memcpy(tmp->buf + pvt->samples, f->data.ptr, f->datalen);
+-	pvt->samples += f->samples;
+-	return 0;
+-}
+-
+-static struct ast_frame *lintolpc10_frameout(struct ast_trans_pvt *pvt)
+-{
+-	struct lpc10_coder_pvt *tmp = pvt->pvt;
+-	int x;
+-	int datalen = 0;	/* output frame */
+-	int samples = 0;	/* output samples */
+-	float tmpbuf[LPC10_SAMPLES_PER_FRAME];
+-	INT32 bits[LPC10_BITS_IN_COMPRESSED_FRAME];	/* XXX what ??? */
+-	/* We can't work on anything less than a frame in size */
+-	if (pvt->samples < LPC10_SAMPLES_PER_FRAME)
+-		return NULL;
+-	while (pvt->samples >=  LPC10_SAMPLES_PER_FRAME) {
+-		/* Encode a frame of data */
+-		for (x=0;x<LPC10_SAMPLES_PER_FRAME;x++)
+-			tmpbuf[x] = (float)tmp->buf[x + samples] / 32768.0;
+-		lpc10_encode(tmpbuf, bits, tmp->lpc10.enc);
+-		build_bits(pvt->outbuf.uc + datalen, bits);
+-		datalen += LPC10_BYTES_IN_COMPRESSED_FRAME;
+-		samples += LPC10_SAMPLES_PER_FRAME;
+-		pvt->samples -= LPC10_SAMPLES_PER_FRAME;
+-		/* Use one of the two left over bits to record if this is a 22 or 23 ms frame...
+-		   important for IAX use */
+-		tmp->longer = 1 - tmp->longer;
+-	}
+-	/* Move the data at the end of the buffer to the front */
+-	if (pvt->samples)
+-		memmove(tmp->buf, tmp->buf + samples, pvt->samples * 2);
+-	return ast_trans_frameout(pvt, datalen, samples);
+-}
+-
+-
+-static void lpc10_destroy(struct ast_trans_pvt *arg)
+-{
+-	struct lpc10_coder_pvt *pvt = arg->pvt;
+-	/* Enc and DEC are both just allocated, so they can be freed */
+-	ast_free(pvt->lpc10.enc);
+-}
+-
+-static struct ast_translator lpc10tolin = {
+-	.name = "lpc10tolin", 
+-	.srcfmt = AST_FORMAT_LPC10,
+-	.dstfmt = AST_FORMAT_SLINEAR,
+-	.newpvt = lpc10_dec_new,
+-	.framein = lpc10tolin_framein,
+-	.destroy = lpc10_destroy,
+-	.sample = lpc10_sample,
+-	.desc_size = sizeof(struct lpc10_coder_pvt),
+-	.buffer_samples = BUFFER_SAMPLES,
+-	.plc_samples = LPC10_SAMPLES_PER_FRAME,
+-	.buf_size = BUFFER_SAMPLES * 2,
+-};
+-
+-static struct ast_translator lintolpc10 = {
+-	.name = "lintolpc10", 
+-	.srcfmt = AST_FORMAT_SLINEAR,
+-	.dstfmt = AST_FORMAT_LPC10,
+-	.newpvt = lpc10_enc_new,
+-	.framein = lintolpc10_framein,
+-	.frameout = lintolpc10_frameout,
+-	.destroy = lpc10_destroy,
+-	.sample = slin8_sample,
+-	.desc_size = sizeof(struct lpc10_coder_pvt),
+-	.buffer_samples = BUFFER_SAMPLES,
+-	.buf_size = LPC10_BYTES_IN_COMPRESSED_FRAME * (1 + BUFFER_SAMPLES / LPC10_SAMPLES_PER_FRAME),
+-};
+-
+-static int parse_config(int reload)
+-{
+-	struct ast_variable *var;
+-	struct ast_flags config_flags = { reload ? CONFIG_FLAG_FILEUNCHANGED : 0 };
+-	struct ast_config *cfg = ast_config_load("codecs.conf", config_flags);
+-	if (cfg == CONFIG_STATUS_FILEMISSING || cfg == CONFIG_STATUS_FILEUNCHANGED || cfg == CONFIG_STATUS_FILEINVALID)
+-		return 0;
+-	for (var = ast_variable_browse(cfg, "plc"); var; var = var->next) {
+-		if (!strcasecmp(var->name, "genericplc")) {
+-			lpc10tolin.useplc = ast_true(var->value) ? 1 : 0;
+-			ast_verb(3, "codec_lpc10: %susing generic PLC\n",
+-					lpc10tolin.useplc ? "" : "not ");
+-		}
+-	}
+-	ast_config_destroy(cfg);
+-	return 0;
+-}
+-
+-static int reload(void)
+-{
+-	if (parse_config(1))
+-		return AST_MODULE_LOAD_DECLINE;
+-	return AST_MODULE_LOAD_SUCCESS;
+-}
+-
+-
+-static int unload_module(void)
+-{
+-	int res;
+-
+-	res = ast_unregister_translator(&lintolpc10);
+-	res |= ast_unregister_translator(&lpc10tolin);
+-
+-	return res;
+-}
+-
+-static int load_module(void)
+-{
+-	int res;
+-
+-	if (parse_config(0))
+-		return AST_MODULE_LOAD_DECLINE;
+-	res = ast_register_translator(&lpc10tolin);
+-	if (!res) 
+-		res = ast_register_translator(&lintolpc10);
+-	else
+-		ast_unregister_translator(&lpc10tolin);
+-	if (res)
+-		return AST_MODULE_LOAD_FAILURE;
+-	return AST_MODULE_LOAD_SUCCESS;
+-}
+-
+-AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "LPC10 2.4kbps Coder/Decoder",
+-		.load = load_module,
+-		.unload = unload_module,
+-		.reload = reload,
+-	       );
+Index: asterisk-1.6.2.5/codecs/.moduleinfo
+===================================================================
+--- asterisk-1.6.2.5.orig/codecs/.moduleinfo	2010-06-19 11:32:18.000000000 +0300
++++ asterisk-1.6.2.5/codecs/.moduleinfo	2010-06-19 20:12:53.000000000 +0300
+@@ -18,8 +18,6 @@
+ <member name="codec_ilbc" displayname="iLBC Coder/Decoder" remove_on_change="codecs/codec_ilbc.o codecs/codec_ilbc.so">
+ 	<defaultenabled>no</defaultenabled>
+ </member>
+-<member name="codec_lpc10" displayname="LPC10 2.4kbps Coder/Decoder" remove_on_change="codecs/codec_lpc10.o codecs/codec_lpc10.so">
+-</member>
+ <member name="codec_resample" displayname="SLIN Resampling Codec" remove_on_change="codecs/codec_resample.o codecs/codec_resample.so">
+ 	<depend>resample</depend>
+ </member>
+Index: asterisk-1.6.2.5/codecs/ex_speex.h
+===================================================================
+--- asterisk-1.6.2.5.orig/codecs/ex_speex.h	2010-06-19 20:10:53.000000000 +0300
++++ asterisk-1.6.2.5/codecs/ex_speex.h	2010-06-19 20:13:43.000000000 +0300
+@@ -30,3 +30,34 @@
+ 
+ 	return &f;
+ }
++
++static uint8_t ex_speex16[] = {
++	0x3f, 0x78, 0x89, 0x14, 0x4a, 0x00, 0x00, 0x7f, 0xff, 0xff,
++	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x92,
++	0x06, 0x3f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
++	0xff, 0xff, 0xff, 0xc0, 0x30, 0x5f, 0xff, 0xfd, 0xbb, 0xee,
++	0x30, 0x56, 0xff, 0xf8, 0x74, 0x54, 0x31, 0xe6, 0xfe, 0x71,
++	0xdc, 0xca, 0x44, 0x6a, 0x43, 0x75, 0xae, 0x31, 0x7a, 0x50,
++	0xd9, 0xfc, 0x93, 0x13, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
++	0xab, 0xab, 0xab, 0xab, 0x3a, 0xba, 0xba, 0xba, 0xba, 0xba,
++	0xba, 0xba, 0xba, 0xba, 0xb0, 0xab, 0xab, 0xab, 0xd9, 0x37,
++	0xab, 0xab, 0xb4, 0x34, 0xe9, 0x0b, 0xd4, 0x2f, 0x13, 0x4c,
++	0xf0, 0xef, 0x8d, 0xdd, 0x99, 0xc7
++};
++
++static struct ast_frame *speex16_sample(void)
++{
++	static struct ast_frame f = {
++		.frametype = AST_FRAME_VOICE,
++		.subclass = AST_FORMAT_SPEEX16,
++		.datalen = sizeof(ex_speex16),
++		/* All frames are 20 ms long */
++		.samples = SPEEX_SAMPLES,
++		.mallocd = 0,
++		.offset = 0,
++		.src = __PRETTY_FUNCTION__,
++		.data.ptr = ex_speex16,
++	};
++
++	return &f;
++}
