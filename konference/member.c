@@ -788,7 +788,7 @@ int member_exec( struct ast_channel* chan, void* data )
 			// no frame has arrived yet
 			// ast_log( LOG_NOTICE, "no frame available from channel, channel => %s\n", chan->name ) ;
 		}
-		else if ( left > 0 && chan->fdno != AST_GENERATOR_FD )
+		else if ( left > 0 )
 		{
 			// a frame has come in before the latency timeout
 			// was reached, so we process the frame
@@ -815,6 +815,11 @@ int member_exec( struct ast_channel* chan, void* data )
 		if (conf->kick_flag || member->kick_flag) {
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "KICKED" );
 			break;
+		}
+		
+		if ( member->moh_stop ) {
+			ast_moh_stop(member->chan);
+			member->moh_stop = 0;
 		}
 
 		//-----------------//
@@ -1203,8 +1208,12 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->sequential_drops = 0 ;
 	member->since_dropped = 0 ;
 
-	// flags
+	// kick flag
 	member->kick_flag = 0;
+
+	// moh flags
+	member->moh_flag = 0;
+	member->moh_stop = 0;
 
 	// record start time
 	// init dropped frame timestamps

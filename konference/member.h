@@ -93,8 +93,9 @@ struct ast_conf_member
 	int talk_volume;
 	int listen_volume;
 
-	// music on hold flag
+	// moh flags
 	char moh_flag;
+	char moh_stop;
 
 	// hold option flag
 	char hold_flag;

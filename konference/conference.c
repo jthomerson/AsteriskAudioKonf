@@ -976,7 +976,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 			ast_mutex_lock( &conf->memberlist->lock ) ;
 			conf->memberlist->moh_flag = 0 ;
 			conf->memberlist->ready_for_outgoing = 1;
-			ast_moh_stop(conf->memberlist->chan);
+			conf->memberlist->moh_stop = 1;
 			ast_mutex_unlock( &conf->memberlist->lock ) ;
 		}
 	}
@@ -3083,7 +3083,7 @@ int stop_moh_channel(int fd, const char *channel)
 		return 0;
 	} else if (!member->norecv_audio && member->moh_flag)
 	{
-		ast_moh_stop(member->chan);
+		member->moh_stop = 1;
 
 		member->moh_flag = member->muted = 0;
 		member->ready_for_outgoing = 1;
