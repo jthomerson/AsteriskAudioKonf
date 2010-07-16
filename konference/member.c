@@ -105,8 +105,8 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 				"Mute: %d\r\n",
 				conf->name,
 				member->type,
-				member->uniqueid,
-				member->channel_name,
+				member->chan->uniqueid,
+				member->chan->name,
 				member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
 				member->chan->cid.cid_name ? member->chan->cid.cid_name : "unknown",
 				f->subclass,
@@ -306,7 +306,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			              "ConferenceCameraDisabled",
 			              "ConferenceName: %s\r\nChannel: %s\r\n",
 			              conf->name,
-			              member->channel_name);
+			              member->chan->name);
 			member->no_camera = 1;
 			ast_mutex_unlock(&member->lock);
 		} else if ( strncmp(CASTDATA2PTR(f->data, char), AST_CONF_CONTROL_CAMERA_ENABLED, strlen(AST_CONF_CONTROL_CAMERA_ENABLED)) == 0 )
@@ -316,7 +316,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			              "ConferenceCameraEnabled",
 			              "ConferenceName: %s\r\nChannel: %s\r\n",
 			              conf->name,
-			              member->channel_name);
+			              member->chan->name);
 			member->no_camera = 0;
 			ast_mutex_unlock(&member->lock);
 		} else if ( strncmp(CASTDATA2PTR(f->data, char), AST_CONF_CONTROL_STOP_VIDEO_TRANSMIT, strlen(AST_CONF_CONTROL_STOP_VIDEO_TRANSMIT)) == 0 )
@@ -326,7 +326,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			              "ConferenceStopVideoTransmit",
 			              "ConferenceName: %s\r\nChannel: %s\r\n",
 			              conf->name,
-			              member->channel_name);
+			              member->chan->name);
 			member->norecv_video = 1;
 			ast_mutex_unlock(&member->lock);
 		} else if ( strncmp(CASTDATA2PTR(f->data, char), AST_CONF_CONTROL_START_VIDEO_TRANSMIT, strlen(AST_CONF_CONTROL_START_VIDEO_TRANSMIT)) == 0 )
@@ -336,7 +336,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			              "ConferenceStartVideoTransmit",
 			              "ConferenceName: %s\r\nChannel: %s\r\n",
 			              conf->name,
-			              member->channel_name);
+			              member->chan->name);
 			member->norecv_video = 0;
 			ast_mutex_unlock(&member->lock);
 		}
@@ -388,7 +388,7 @@ again2:
 			"ConferenceSoundComplete",
 			"Channel: %s\r\n"
 			"Sound: %s\r\n",
-			member->channel_name,
+			member->chan->name,
 			toboot->name
 		);
 	}
@@ -489,7 +489,7 @@ static int process_outgoing(struct ast_conf_member *member)
 		if ( ast_write( member->chan, f ) != 0 )
 		{
 			// log 'dropped' outgoing frame
-			DEBUG("unable to write voice frame to channel, channel => %s\n", member->channel_name) ;
+			DEBUG("unable to write voice frame to channel, channel => %s\n", member->chan->name) ;
 
 			// accounting: count dropped outgoing frames
 			member->frames_out_dropped++ ;
@@ -524,7 +524,7 @@ static int process_outgoing(struct ast_conf_member *member)
 		if ( ast_write_video( member->chan, f ) != 1 )
 		{
 			// log 'dropped' outgoing frame
-			DEBUG("unable to write video frame to channel, channel => %s\n", member->channel_name) ;
+			DEBUG("unable to write video frame to channel, channel => %s\n", member->chan->name) ;
 
 			// accounting: count dropped outgoing frames
 			member->video_frames_out_dropped++ ;
@@ -552,7 +552,7 @@ static int process_outgoing(struct ast_conf_member *member)
 		if ( ast_write( member->chan, cf->fr ) != 0 )
 		{
 			// log 'dropped' outgoing frame
-			DEBUG("unable to write dtmf frame to channel, channel => %s\n", member->channel_name) ;
+			DEBUG("unable to write dtmf frame to channel, channel => %s\n", member->chan->name) ;
 
 			// accounting: count dropped outgoing frames
 			member->dtmf_frames_out_dropped++ ;
@@ -580,7 +580,7 @@ static int process_outgoing(struct ast_conf_member *member)
 		if ( ast_write( member->chan, cf->fr ) != 0 )
 		{
 			// log 'dropped' outgoing frame
-			DEBUG("unable to write text frame to channel, channel => %s\n", member->channel_name) ;
+			DEBUG("unable to write text frame to channel, channel => %s\n", member->chan->name) ;
 
 			// accounting: count dropped outgoing frames
 			member->text_frames_out_dropped++ ;
@@ -608,6 +608,7 @@ int member_exec( struct ast_channel* chan, void* data )
 //	start = ast_tvnow();
 
 	struct ast_conference *conf ;
+	char conf_name[CONF_NAME_LEN + 1]  = { 0 };
 	struct ast_conf_member *member ;
 
 	struct ast_frame *f ; // frame received from ast_read()
@@ -637,7 +638,7 @@ int member_exec( struct ast_channel* chan, void* data )
 
 	//DEBUG("creating new member, id => %s, flags => %s, p => %s\n", id, flags, priority) ;
 
-	member = create_member( chan, (const char*)( data ) ) ; // flags, atoi( priority ) ) ;
+	member = create_member( chan, (const char*)( data ), conf_name ) ; // flags, atoi( priority ) ) ;
 
 	// unable to create member, return an error
 	if ( member == NULL )
@@ -672,11 +673,11 @@ int member_exec( struct ast_channel* chan, void* data )
 	//
 
 	char max_users_flag = 0 ;
-	conf = join_conference( member, &max_users_flag ) ;
+	conf = join_conference( member, conf_name, &max_users_flag ) ;
 
 	if ( conf == NULL )
 	{
-		ast_log( LOG_NOTICE, "unable to setup member conference %s: max_users_flag is %d\n", member->conf_name, max_users_flag ) ;
+		ast_log( LOG_NOTICE, "unable to setup member conference %s: max_users_flag is %d\n", conf_name, max_users_flag ) ;
 		delete_member( member) ;
 		return (max_users_flag ? 0 : -1 ) ;
 	}
@@ -694,7 +695,7 @@ int member_exec( struct ast_channel* chan, void* data )
 			spyee->spy_partner = member;
 			ast_mutex_unlock( &spyee->lock ) ;
 
-			//DEBUG("Start spyer %s, spyee is %s\n", member->channel_name, member->spyee_channel_name) ;
+			//DEBUG("Start spyer %s, spyee is %s\n", member->chan->name, member->spyee_channel_name) ;
 		} else
 		{
 			if ( spyee != NULL ) {
@@ -703,7 +704,7 @@ int member_exec( struct ast_channel* chan, void* data )
 				ast_mutex_unlock( &spyee->lock ) ;
 			}
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "SPYFAILED" );
-			//DEBUG("Failed to start spyer %s, spyee is %s\n", member->channel_name, member->spyee_channel_name) ;
+			//DEBUG("Failed to start spyer %s, spyee is %s\n", member->chan->name, member->spyee_channel_name) ;
 			remove_member( member, conf ) ;
 			return 0 ;
 		}
@@ -733,10 +734,10 @@ int member_exec( struct ast_channel* chan, void* data )
 		"Count: %d\r\n",
 		conf->name,
 		member->type,
-		member->uniqueid,
+		member->chan->uniqueid,
 		member->id,
 		member->flags,
-		member->channel_name,
+		member->chan->name,
 		member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
 		member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown",
 		conf->stats.moderators,
@@ -865,7 +866,7 @@ int member_exec( struct ast_channel* chan, void* data )
 
 		ast_mutex_unlock ( &spyee->lock ) ;
 
-		//DEBUG("End spyer %s, spyee is %s\n", member->channel_name, member->spyee_channel_name) ;
+		//DEBUG("End spyer %s, spyee is %s\n", member->chan->name, member->spyee_channel_name) ;
 	}
 
 	remove_member( member, conf ) ;
@@ -901,7 +902,7 @@ struct ast_conf_member *check_active_video( int id, struct ast_conference *conf 
 // manange member functions
 //
 
-struct ast_conf_member* create_member( struct ast_channel *chan, const char* data )
+struct ast_conf_member* create_member( struct ast_channel *chan, const char* data, char* conf_name )
 {
 #ifdef	APP_KONFERENCE_DEBUG
 	//
@@ -955,7 +956,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	//
 	// initialize member with passed data values
 	//
-	char argstr[256] ;
+	char argstr[256] = { 0 };
 
 	// copy the passed data
 	strncpy( argstr, data, sizeof(argstr) - 1 ) ;
@@ -969,8 +970,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	char *token;
 	if ( ( token = strsep( &stringp, argument_delimiter ) ) != NULL )
 	{
-		member->conf_name = malloc( strlen( token ) + 1 ) ;
-		strcpy( member->conf_name, token ) ;
+		strncpy( conf_name, token, CONF_NAME_LEN ) ;
 	}
 	else
 	{
@@ -1061,14 +1061,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// keep pointer to member's channel
 	member->chan = chan ;
-
-	// copy the channel name
-	member->channel_name = malloc( strlen( chan->name ) + 1 ) ;
-	strcpy( member->channel_name, chan->name ) ;
-
-	// copy the uniqueid
-	member->uniqueid = malloc( strlen( chan->uniqueid ) + 1 ) ;
-	strcpy( member->uniqueid, chan->uniqueid ) ;
 
 	// set default if no type parameter
 	if (!member->type) {
@@ -1602,7 +1594,7 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	if ( member->flags != NULL )
 	{
 		// !!! DEBUGING !!!
-		DEBUG("freeing member flags, name => %s\n", member->channel_name) ;
+		DEBUG("freeing member flags, name => %s\n", member->chan->name) ;
 		free( member->flags ) ;
 	}
 
@@ -1613,7 +1605,7 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	conf_frame* cf ;
 
 	// !!! DEBUGING !!!
-	DEBUG("deleting member input frames, name => %s\n", member->channel_name) ;
+	DEBUG("deleting member input frames, name => %s\n", member->chan->name) ;
 
 	// incoming frames
 	cf = member->inFrames ;
@@ -1637,7 +1629,7 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	}
 #endif
 	// !!! DEBUGING !!!
-	DEBUG("deleting member output frames, name => %s\n", member->channel_name) ;
+	DEBUG("deleting member output frames, name => %s\n", member->chan->name) ;
 
 	// outgoing frames
 	cf = member->outFrames ;
@@ -1664,13 +1656,13 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	if ( member->dsp != NULL )
 	{
 		// !!! DEBUGING !!!
-		DEBUG("destroying member preprocessor, name => %s\n", member->channel_name) ;
+		DEBUG("destroying member preprocessor, name => %s\n", member->chan->name) ;
 		speex_preprocess_state_destroy( member->dsp ) ;
 	}
 #endif
 
 	// !!! DEBUGING !!!
-	DEBUG("freeing member translator paths, name => %s\n", member->channel_name) ;
+	DEBUG("freeing member translator paths, name => %s\n", member->chan->name) ;
 
 	// free the mixing translators
 	ast_translator_free_path( member->to_slinear ) ;
@@ -1679,18 +1671,6 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 	// get a pointer to the next
 	// member so we can return it
 	struct ast_conf_member* nm = member->next ;
-
-	// !!! DEBUGING !!!
-	DEBUG("freeing member channel name, name => %s\n", member->channel_name) ;
-
-	// free the member's copy for the channel name
-	free( member->channel_name ) ;
-
-	// free the member's copy of the uniqueid
-	free( member->uniqueid ) ;
-
-	// free the member's copy of the conference name
-	free(member->conf_name);
 
 	// free the member's copy of the conference type
 	free(member->type);
@@ -1883,7 +1863,7 @@ conf_frame* get_incoming_frame( struct ast_conf_member *member )
 		}
 		else
 		{
-			DEBUG("repeating cached frame, channel => %s, inFramesRepeatLast => %d\n", member->channel_name, member->inFramesRepeatLast) ;
+			DEBUG("repeating cached frame, channel => %s, inFramesRepeatLast => %d\n", member->chan->name, member->inFramesRepeatLast) ;
 
 			// increment counter
 			member->inFramesRepeatLast++ ;
@@ -1896,7 +1876,7 @@ conf_frame* get_incoming_frame( struct ast_conf_member *member )
 	}
 	else if ( member->okayToCacheLast == 0 && member->inFramesCount >= 3 )
 	{
-		DEBUG("enabling cached frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inFramesCount, member->outFramesCount) ;
+		DEBUG("enabling cached frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inFramesCount, member->outFramesCount) ;
 
 		// turn on 'okay to cache' flag
 		member->okayToCacheLast = 1 ;
@@ -1997,7 +1977,7 @@ int queue_incoming_video_frame( struct ast_conf_member* member, const struct ast
 	// We have to drop if the queue is full!
 	if ( member->inVideoFramesCount >= AST_CONF_MAX_VIDEO_QUEUE )
 	{
-		DEBUG("unable to queue incoming VIDEO frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inVideoFramesCount, member->outVideoFramesCount) ;
+		DEBUG("unable to queue incoming VIDEO frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inVideoFramesCount, member->outVideoFramesCount) ;
 		ast_mutex_unlock(&member->lock);
 		return -1 ;
 	}
@@ -2069,7 +2049,7 @@ int queue_incoming_dtmf_frame( struct ast_conf_member* member, const struct ast_
 	// We have to drop if the queue is full!
 	if ( member->inDTMFFramesCount >= AST_CONF_MAX_DTMF_QUEUE )
 	{
-		DEBUG("unable to queue incoming DTMF frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inDTMFFramesCount, member->outDTMFFramesCount) ;
+		DEBUG("unable to queue incoming DTMF frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inDTMFFramesCount, member->outDTMFFramesCount) ;
 		ast_mutex_unlock(&member->lock);
 		return -1 ;
 	}
@@ -2158,7 +2138,7 @@ int queue_incoming_frame( struct ast_conf_member* member, struct ast_frame* fr )
 				// count sequential drops
 				member->sequential_drops++ ;
 
-				DEBUG("dropping frame from input buffer, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inFramesCount, member->outFramesCount) ;
+				DEBUG("dropping frame from input buffer, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inFramesCount, member->outFramesCount) ;
 
 				// accounting: count dropped incoming frames
 				member->frames_in_dropped++ ;
@@ -2174,7 +2154,7 @@ int queue_incoming_frame( struct ast_conf_member* member, struct ast_frame* fr )
 /*
 			else
 			{
-				DEBUG("input buffer larger than drop threshold, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inFramesCount, member->outFramesCount) ;
+				DEBUG("input buffer larger than drop threshold, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inFramesCount, member->outFramesCount) ;
 			}
 */
 		}
@@ -2190,7 +2170,7 @@ int queue_incoming_frame( struct ast_conf_member* member, struct ast_frame* fr )
 		// count sequential drops
 		member->sequential_drops++ ;
 
-		DEBUG("unable to queue incoming frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inFramesCount, member->outFramesCount) ;
+		DEBUG("unable to queue incoming frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inFramesCount, member->outFramesCount) ;
 
 		// accounting: count dropped incoming frames
 		member->frames_in_dropped++ ;
@@ -2365,7 +2345,7 @@ int __queue_outgoing_frame( struct ast_conf_member* member, const struct ast_fra
 	//
 	if ( member->outFramesCount >= AST_CONF_MAX_QUEUE )
 	{
-		DEBUG("unable to queue outgoing frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inFramesCount, member->outFramesCount) ;
+		DEBUG("unable to queue outgoing frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inFramesCount, member->outFramesCount) ;
 
 		// accounting: count dropped outgoing frames
 		member->frames_out_dropped++ ;
@@ -2532,7 +2512,7 @@ int queue_outgoing_video_frame( struct ast_conf_member* member, const struct ast
 	//
 	if ( member->outVideoFramesCount >= AST_CONF_MAX_VIDEO_QUEUE)
 	{
-		DEBUG("unable to queue outgoing VIDEO frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inVideoFramesCount, member->outVideoFramesCount) ;
+		DEBUG("unable to queue outgoing VIDEO frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inVideoFramesCount, member->outVideoFramesCount) ;
 
 		// accounting: count dropped outgoing frames
 		member->video_frames_out_dropped++ ;
@@ -2719,7 +2699,7 @@ int queue_outgoing_dtmf_frame( struct ast_conf_member* member, const struct ast_
 	//
 	if ( member->outDTMFFramesCount >= AST_CONF_MAX_DTMF_QUEUE)
 	{
-		DEBUG("unable to queue outgoing DTMF frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inDTMFFramesCount, member->outDTMFFramesCount) ;
+		DEBUG("unable to queue outgoing DTMF frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inDTMFFramesCount, member->outDTMFFramesCount) ;
 
 		// accounting: count dropped outgoing frames
 		member->dtmf_frames_out_dropped++ ;
@@ -2796,7 +2776,7 @@ int queue_outgoing_text_frame( struct ast_conf_member* member, const struct ast_
 	//
 	if ( member->outTextFramesCount >= AST_CONF_MAX_TEXT_QUEUE)
 	{
-		DEBUG("unable to queue outgoing text frame, channel => %s, incoming => %d, outgoing => %d\n", member->channel_name, member->inTextFramesCount, member->outTextFramesCount) ;
+		DEBUG("unable to queue outgoing text frame, channel => %s, incoming => %d, outgoing => %d\n", member->chan->name, member->inTextFramesCount, member->outTextFramesCount) ;
 
 		// accounting: count dropped outgoing frames
 		member->text_frames_out_dropped++ ;
@@ -2865,12 +2845,12 @@ void send_state_change_notifications( struct ast_conf_member* member )
 				"Channel: %s\r\n"
 				"Flags: %s\r\n"
 				"State: %s\r\n",
-				member->channel_name,
+				member->chan->name,
 				member->flags,
 				( ( member->speaking_state == 1 ) ? "speaking" : "silent" )
 			) ;
 
-			DEBUG("member state changed, channel => %s, state => %d, incoming => %d, outgoing => %d\n", member->channel_name, member->speaking_state, member->inFramesCount, member->outFramesCount) ;
+			DEBUG("member state changed, channel => %s, state => %d, incoming => %d, outgoing => %d\n", member->chan->name, member->speaking_state, member->inFramesCount, member->outFramesCount) ;
 
 			member->speaking_state_notify = 0;
 		}
@@ -3148,7 +3128,7 @@ int queue_frame_for_listener(
 		}
 		else
 		{
-			ast_log( LOG_WARNING, "unable to translate outgoing listener frame, channel => %s\n", member->channel_name ) ;
+			ast_log( LOG_WARNING, "unable to translate outgoing listener frame, channel => %s\n", member->chan->name ) ;
 		}
 
 		// set found flag
@@ -3248,7 +3228,7 @@ int queue_frame_for_speaker(
 			}
 			else
 			{
-				ast_log( LOG_WARNING, "unable to translate outgoing speaker frame, channel => %s\n", member->channel_name ) ;
+				ast_log( LOG_WARNING, "unable to translate outgoing speaker frame, channel => %s\n", member->chan->name ) ;
 			}
 		}
 
@@ -3359,7 +3339,7 @@ int queue_silent_frame(
 	}
 	else
 	{
-		ast_log( LOG_ERROR, "unable to translate outgoing silent frame, channel => %s\n", member->channel_name ) ;
+		ast_log( LOG_ERROR, "unable to translate outgoing silent frame, channel => %s\n", member->chan->name ) ;
 	}
 
 	return 0 ;
@@ -3479,7 +3459,7 @@ void member_process_spoken_frames(struct ast_conference* conf,
 		&& member->inFramesNeeded > 0
 		)
 	{
-		DEBUG("channel => %s, inFramesNeeded => %d, inFramesCount => %d\n", member->channel_name, member->inFramesNeeded, member->inFramesCount) ;
+		DEBUG("channel => %s, inFramesNeeded => %d, inFramesCount => %d\n", member->chan->name, member->inFramesNeeded, member->inFramesCount) ;
 	}
 #endif
 	// non-listener member should have frames,

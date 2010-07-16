@@ -39,6 +39,12 @@
 #include "common.h"
 
 //
+// defines
+//
+
+#define CONF_NAME_LEN 80
+
+//
 // struct declarations
 //
 
@@ -51,7 +57,7 @@ struct conference_bucket *conference_table ;
 typedef struct ast_conference_stats
 {
 	// conference name ( copied for ease of use )
-	char name[128] ;
+	char name[CONF_NAME_LEN + 1] ;
 
 	// type of connection
 	unsigned short phone ;
@@ -75,7 +81,7 @@ typedef struct ast_conference_stats
 struct ast_conference
 {
 	// conference name
-	char name[128] ;
+	char name[CONF_NAME_LEN + 1] ;
 
 	// conference volume
 	int volume;
@@ -153,7 +159,7 @@ int hash( const char *channel_name ) ;
 
 int count_exec( struct ast_channel* chan, void* data ) ;
 
-struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag ) ;
+struct ast_conference* join_conference( struct ast_conf_member* member, char* conf_name, char* max_users_flag ) ;
 
 int end_conference( const char *name, int hangup ) ;
 

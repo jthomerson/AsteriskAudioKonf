@@ -55,9 +55,7 @@ struct ast_conf_member
 	ast_mutex_t lock ; // member data mutex
 
 	struct ast_channel* chan ; // member's channel
-	char* channel_name ; // member's channel name
-
-	char* uniqueid ;  // member's uniqueid
+	struct ast_conference* conf ; // member's conference
 
 	ast_cond_t delete_var ; // delete cv
 	char delete_flag ; // delete flag
@@ -67,7 +65,6 @@ struct ast_conf_member
 	int priority ;	// highest priority gets the channel
 	char* flags ;	// raw member-type flags
 	char *type ;		// conference type
-	char* conf_name ;		// name of the conference that own this member
 	char *spyee_channel_name ; // spyee  channel name
 	int max_users ; // zero or max users for this conference
 
@@ -326,7 +323,7 @@ int member_exec( struct ast_channel* chan, void* data ) ;
 
 struct ast_conf_member* check_active_video( int id, struct ast_conference *conf );
 
-struct ast_conf_member* create_member( struct ast_channel* chan, const char* data ) ;
+struct ast_conf_member* create_member( struct ast_channel* chan, const char* data, char* conf_name ) ;
 struct ast_conf_member* delete_member( struct ast_conf_member* member ) ;
 
 // incoming queue

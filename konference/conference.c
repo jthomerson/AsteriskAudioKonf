@@ -589,7 +589,7 @@ void init_conference( void )
 	argument_delimiter = ( !strcmp(PACKAGE_VERSION,"1.4") ? "|" : "," ) ;
 }
 
-struct ast_conference* join_conference( struct ast_conf_member* member, char* max_users_flag )
+struct ast_conference* join_conference( struct ast_conf_member* member, char* conf_name, char* max_users_flag )
 {
 	struct ast_conference* conf = NULL ;
 
@@ -600,7 +600,7 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 
 	// look for an existing conference
 	DEBUG("attempting to find requested conference\n") ;
-	conf = find_conf( member->conf_name ) ;
+	conf = find_conf( conf_name ) ;
 
 	// unable to find an existing conference, try to create one
 	if ( conf == NULL )
@@ -609,11 +609,14 @@ struct ast_conference* join_conference( struct ast_conf_member* member, char* ma
 		DEBUG("attempting to create requested conference\n") ;
 
 		// create the new conference with one member
-		conf = create_conf( member->conf_name, member ) ;
+		conf = create_conf( conf_name, member ) ;
 
 		// return an error if create_conf() failed
+		// otherwise set the member's pointer to its conference
 		if ( conf == NULL )
 			ast_log( LOG_ERROR, "unable to find or create requested conference\n" ) ;
+		else
+			member->conf = conf ;
 	}
 	else
 	{
@@ -858,7 +861,6 @@ struct ast_conference *remove_conf( struct ast_conference *conf )
 
 	if ( conf == conflist )
 		conflist = conf_temp ;
-		
 
 	free( conf ) ;
 
@@ -1145,7 +1147,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 				// log some accounting information
 				//
 
-				DEBUG("member accounting, channel => %s, te => %ld, fi => %ld, fid => %ld, fo => %ld, fod => %ld, tt => %ld\n", member->channel_name, member->time_entered.tv_sec, member->frames_in, member->frames_in_dropped, member->frames_out, member->frames_out_dropped, tt) ;
+				DEBUG("member accounting, channel => %s, te => %ld, fi => %ld, fid => %ld, fo => %ld, fod => %ld, tt => %ld\n", member->chan->name, member->time_entered.tv_sec, member->frames_in, member->frames_in_dropped, member->frames_out, member->frames_out_dropped, tt) ;
 			}
 #endif
 			//
@@ -1199,7 +1201,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 					"ConferenceVideoBroadcastOff",
 					"ConferenceName: %s\r\nChannel: %s\r\n",
 					conf->name,
-					member->channel_name
+					member->chan->name
 					);
 			}
 
@@ -1245,12 +1247,12 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		"Duration: %ld\r\n"
 		"Moderators: %d\r\n"
 		"Count: %d\r\n",
-		member->conf_name,
+		member->conf->name,
 		member->type,
-		member->uniqueid,
+		member->chan->uniqueid,
 		member->id,
 		member->flags,
-		member->channel_name,
+		member->chan->name,
 		member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
 		member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown",
 		tt,
@@ -1282,7 +1284,7 @@ int set_conference_debugging( const char* name, int state )
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), name, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), name ) == 0 )
 		{
 			// lock conference
 			// ast_mutex_lock( &(conf->lock) ) ;
@@ -1366,7 +1368,7 @@ int show_conference_list ( int fd, const char *name )
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), name, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), name ) == 0 )
 		{
 			// acquire conference lock
 			ast_rwlock_rdlock(&conf->lock);
@@ -1390,14 +1392,14 @@ int show_conference_list ( int fd, const char *name )
 				if ( member->driven_member == NULL )
 				{
 					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", member->bucket - channel_table, spy_str, member->channel_name);
+					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", member->bucket - channel_table, spy_str, member->chan->name);
 				} else {
 					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d  %-20ld %-20.20s %-80s\n", member->id, member->flags,
-					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->bucket - channel_table, spy_str, member->channel_name);
+					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->bucket - channel_table, spy_str, member->chan->name);
 				}
 #else
 				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->bucket - channel_table, spy_str, member->channel_name);
+				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->bucket - channel_table, spy_str, member->chan->name);
 #endif
 				member = member->next;
 			}
@@ -1443,7 +1445,7 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), conffilter, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), conffilter ) == 0 )
 		{
 			// do the biz
 			member = conf->memberlist ;
@@ -1465,7 +1467,7 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 						"\r\n",
 						conf->name,
 						member->id,
-						member->channel_name,
+						member->chan->name,
 						member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
 						member->chan->cid.cid_name ? member->chan->cid.cid_name : "unknown",
 						member->mute_audio ? "YES" : "NO",
@@ -1541,7 +1543,7 @@ int kick_member (  const char* confname, int user_id)
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1634,7 +1636,7 @@ int mute_member (  const char* confname, int user_id)
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1650,7 +1652,7 @@ int mute_member (  const char* confname, int user_id)
 						EVENT_FLAG_CALL,
 						"ConferenceMemberMute",
 						"Channel: %s\r\n",
-						member->channel_name
+						member->chan->name
 					) ;
 				      res = 1;
 			      }
@@ -1689,7 +1691,7 @@ int mute_conference (  const char* confname)
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1745,7 +1747,7 @@ int unmute_member (  const char* confname, int user_id)
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1761,7 +1763,7 @@ int unmute_member (  const char* confname, int user_id)
 						EVENT_FLAG_CALL,
 						"ConferenceMemberUnmute",
 						"Channel: %s\r\n",
-						member->channel_name
+						member->chan->name
 					) ;
 				      res = 1;
 			      }
@@ -1800,7 +1802,7 @@ int unmute_conference (  const char* confname)
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1856,7 +1858,7 @@ int viewstream_switch ( const char* confname, int user_id, int stream_id )
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
@@ -1910,14 +1912,14 @@ int viewchannel_switch ( const char* confname, const char* userchan, const char*
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), confname, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), confname ) == 0 )
 		{
 		        // do the biz
 			ast_rwlock_rdlock( &conf->lock ) ;
 		        member = conf->memberlist ;
 			while (member != NULL)
 			{
-				if (strncasecmp( member->channel_name, streamchan, 80 ) == 0)
+				if (strcasecmp( member->chan->name, streamchan ) == 0)
 				{
 					stream_id = member->id;
 				}
@@ -1931,7 +1933,7 @@ int viewchannel_switch ( const char* confname, const char* userchan, const char*
 				member = conf->memberlist ;
 				while (member != NULL)
 				{
-					if (strncasecmp( member->channel_name, userchan, 80 ) == 0)
+					if (strcasecmp( member->chan->name, userchan ) == 0)
 					{
 						// switch the video
 						ast_mutex_lock( &member->lock ) ;
@@ -2015,7 +2017,7 @@ int get_conference_stats_by_name( ast_conference_stats* stats, const char* name 
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		if ( strncasecmp( (const char*)&(conf->name), name, 80 ) == 0 )
+		if ( strcasecmp( (const char*)&(conf->name), name ) == 0 )
 		{
 			// copy stats for found conference
 			*stats = conf->stats ;
@@ -2039,7 +2041,7 @@ struct ast_conf_member *find_member( const char *chan )
 	AST_LIST_LOCK ( bucket ) ;
 
 	AST_LIST_TRAVERSE ( bucket, member, hash_entry )
-		if (!strcmp (member->channel_name, chan) ) {
+		if (!strcmp (member->chan->name, chan) ) {
 			ast_mutex_lock (&member->lock) ;
 			member->use_count++ ;
 			break ;
@@ -2192,7 +2194,7 @@ int lock_conference(const char *conference, int member_id)
 					conf->video_locked = 1;
 					res = 1;
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceLock", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceLock", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 					break;
 				}
 			}
@@ -2233,13 +2235,13 @@ int lock_conference_channel(const char *conference, const char *channel)
 
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
-				if ( strcmp(channel, member->channel_name) == 0 && !member->mute_video )
+				if ( strcmp(channel, member->chan->name) == 0 && !member->mute_video )
 				{
 					do_video_switching(conf, member->id, 0);
 					conf->video_locked = 1;
 					res = 1;
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceLock", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceLock", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 					break;
 				}
 			}
@@ -2330,7 +2332,7 @@ int set_default_id(const char *conference, int member_id)
 						conf->default_video_source_id = member_id;
 						res = 1;
 
-						manager_event(EVENT_FLAG_CALL, "ConferenceDefault", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+						manager_event(EVENT_FLAG_CALL, "ConferenceDefault", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 						break;
 					}
 				}
@@ -2375,7 +2377,7 @@ int set_default_channel(const char *conference, const char *channel)
 			{
 				// We do not allow video muted members or members that do not support
 				// VAD switching to become defaults
-				if ( strcmp(channel, member->channel_name) == 0 &&
+				if ( strcmp(channel, member->chan->name) == 0 &&
 				     !member->mute_video &&
 				     member->vad_switch
 				   )
@@ -2383,7 +2385,7 @@ int set_default_channel(const char *conference, const char *channel)
 					conf->default_video_source_id = member->id;
 					res = 1;
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceDefault", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceDefault", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 					break;
 				}
 			}
@@ -2433,7 +2435,7 @@ int video_mute_member(const char *conference, int member_id)
 					// release member mutex
 					ast_mutex_unlock( &member->lock );
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceVideoMute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceVideoMute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 
 					if ( member->id == conf->current_video_source_id )
 					{
@@ -2491,7 +2493,7 @@ int video_unmute_member(const char *conference, int member_id)
 					// release member mutex
 					ast_mutex_unlock( &member->lock );
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceVideoUnmute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceVideoUnmute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 
 					res = 1;
 					break;
@@ -2534,7 +2536,7 @@ int video_mute_channel(const char *conference, const char *channel)
 
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
-				if ( strcmp(channel, member->channel_name) == 0 )
+				if ( strcmp(channel, member->chan->name) == 0 )
 				{
 					// acquire member mutex
 					ast_mutex_lock( &member->lock );
@@ -2544,7 +2546,7 @@ int video_mute_channel(const char *conference, const char *channel)
 					// release member mutex
 					ast_mutex_unlock( &member->lock );
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceVideoMute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceVideoMute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 
 					if ( member->id == conf->current_video_source_id )
 					{
@@ -2592,7 +2594,7 @@ int video_unmute_channel(const char *conference, const char *channel)
 
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
-				if ( strcmp(channel, member->channel_name) == 0 )
+				if ( strcmp(channel, member->chan->name) == 0 )
 				{
 					// acquire member mutex
 					ast_mutex_lock( &member->lock );
@@ -2602,7 +2604,7 @@ int video_unmute_channel(const char *conference, const char *channel)
 					// release member mutex
 					ast_mutex_unlock( &member->lock );
 
-					manager_event(EVENT_FLAG_CALL, "ConferenceVideoUnmute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->channel_name);
+					manager_event(EVENT_FLAG_CALL, "ConferenceVideoUnmute", "ConferenceName: %s\r\nChannel: %s\r\n", conf->name, member->chan->name);
 
 					res = 1;
 					break;
@@ -2691,7 +2693,7 @@ int send_text_channel(const char *conference, const char *channel, const char *t
 
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
-				if ( strcmp(member->channel_name, channel) == 0 )
+				if ( strcmp(member->chan->name, channel) == 0 )
 				{
 					res = send_text_message_to_member(member, text) == 0;
 					break;
@@ -2878,9 +2880,9 @@ int drive_channel(const char *conference, const char *src_channel, const char *d
 			dst = NULL;
 			for ( member = conf->memberlist ; member != NULL ; member = member->next )
 			{
-				if ( strcmp(src_channel, member->channel_name) == 0 )
+				if ( strcmp(src_channel, member->chan->name) == 0 )
 					src = member;
-				if ( dst_channel != NULL && strcmp(dst_channel, member->channel_name) == 0 )
+				if ( dst_channel != NULL && strcmp(dst_channel, member->chan->name) == 0 )
 					dst = member;
 			}
 			if ( src != NULL )
@@ -2966,7 +2968,7 @@ static void do_video_switching(struct ast_conference *conf, int new_id, int lock
 			"ConferenceVideoSwitch",
 			"ConferenceName: %s\r\nChannel: %s\r\n",
 			conf->name,
-			new_member == NULL ? "empty" : new_member->channel_name
+			new_member == NULL ? "empty" : new_member->chan->name
 			);
 
 		conf->current_video_source_id = new_id;
@@ -3187,7 +3189,7 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 				"ConferenceVideoBroadcastOff",
 				"ConferenceName: %s\r\nChannel: %s\r\n",
 				conf->name,
-				member->channel_name
+				member->chan->name
 				);
 	} else if ( cfr != NULL )
 	{
@@ -3199,7 +3201,7 @@ static int update_member_broadcasting(struct ast_conference *conf, struct ast_co
 				"ConferenceVideoBroadcastOn",
 				"ConferenceName: %s\r\nChannel: %s\r\n",
 				conf->name,
-				member->channel_name
+				member->chan->name
 				);
 		}
 	}
