@@ -938,20 +938,15 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// initialize cv
 	ast_cond_init( &member->delete_var, NULL ) ;
-	// initialize flag and count
-	member->delete_flag = member->use_count = 0 ;
 
 	// Default values for parameters that can get overwritten by dialplan arguments
 #ifdef	VIDEO
 	member->video_start_timeout = AST_CONF_VIDEO_START_TIMEOUT;
 	member->video_stop_timeout = AST_CONF_VIDEO_STOP_TIMEOUT;
 #endif
-	member->priority = 0;
 	member->vad_prob_start = AST_CONF_PROB_START;
 	member->vad_prob_continue = AST_CONF_PROB_CONTINUE;
 	member->max_users = AST_CONF_MAX_USERS;
-	member->type = NULL;
-	member->spyee_channel_name = NULL;
 
 	//
 	// initialize member with passed data values
@@ -1069,52 +1064,9 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		DEBUG("type = %s\n", member->type) ;
 	}
 
-	// spy_partner default is NULL
-	member->spy_partner = NULL;
-
-	// ( default can be overridden by passed flags )
-	member->mute_audio = 0;
-#ifdef	VIDEO
-	member->mute_video = 0;
-#endif
-	member->talk_volume = 0;
-	member->listen_volume = 0;
-	member->norecv_audio = 0;
-#ifdef	VIDEO
-	member->norecv_video = 0;
-	member->no_camera = 0;
-#endif
-	// moderator?
-	member->ismoderator = 0;
-	member->kick_conferees = 0;
-
-	// ready flag
-	member->ready_for_outgoing = 0 ;
-
-	// incoming frame queue
-	member->inFrames = NULL ;
-	member->inFramesTail = NULL ;
-	member->inFramesCount = 0 ;
-#ifdef	VIDEO
-	member->inVideoFrames = NULL ;
-	member->inVideoFramesTail = NULL ;
-	member->inVideoFramesCount = 0 ;
-#endif
-#ifdef	DTMF
-	member->inDTMFFrames = NULL ;
-	member->inDTMFFramesTail = NULL ;
-	member->inDTMFFramesCount = 0 ;
-#endif
-#ifdef	TEXT
-	member->inTextFrames = NULL ;
-	member->inTextFramesTail = NULL ;
-	member->inTextFramesCount = 0 ;
-#endif
 #ifdef	VIDEO
 	member->conference = 1; // we have switched req_id
-	member->dtmf_switch = 0; // no dtmf switch by default
 #endif
-	member->dtmf_relay = 0; // no dtmf relay by default
 
 	// start of day video ids
 #ifdef	VIDEO
@@ -1122,90 +1074,8 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 #endif
 	member->id = -1;
 
-	member->first_frame_received = 0; // cause a FIR after NAT delay
-
-	// last frame caching
-	member->inFramesRepeatLast = 0 ;
-	member->inFramesLast = NULL ;
-	member->okayToCacheLast = 0 ;
-
-	// outgoing frame queue
-	member->outFrames = NULL ;
-	member->outFramesTail = NULL ;
-	member->outFramesCount = 0 ;
-#ifdef	VIDEO
-	member->outVideoFrames = NULL ;
-	member->outVideoFramesTail = NULL ;
-	member->outVideoFramesCount = 0 ;
-#endif
-#ifdef	DTMF
-	member->outDTMFFrames = NULL ;
-	member->outDTMFFramesTail = NULL ;
-	member->outDTMFFramesCount = 0 ;
-#endif
-#ifdef	TEXT
-	member->outTextFrames = NULL ;
-	member->outTextFramesTail = NULL ;
-	member->outTextFramesCount = 0 ;
-#endif
 	// ( not currently used )
 	// member->samplesperframe = AST_CONF_BLOCK_SAMPLES ;
-
-	// used for determining need to mix frames
-	// and for management interface notification
-	// and for VAD based video switching
-	member->speaking_state_notify = 0 ;
-	member->speaking_state = 0 ;
-	member->local_speaking_state = 0;
-	member->last_state_change = (struct timeval){0, 0};
-	member->speaker_count = 0;
-#ifdef	VIDEO
-	member->driven_member = NULL;
-
-	member->video_broadcast_active = 0;
-	member->last_video_frame_time = (struct timeval){0, 0};
-
-	member->video_started = 0;
-#endif
-	// linked-list pointers
-	member->next = NULL ;
-#ifndef	VIDEO
-	member->prev = NULL ;
-#endif
-	member->bucket = NULL ;
-	// account data
-	member->frames_in = 0 ;
-	member->frames_in_dropped = 0 ;
-	member->frames_out = 0 ;
-	member->frames_out_dropped = 0 ;
-#ifdef	VIDEO
-	member->video_frames_in = 0 ;
-	member->video_frames_in_dropped = 0 ;
-	member->video_frames_out = 0 ;
-	member->video_frames_out_dropped = 0 ;
-#endif
-#ifdef	DTMF
-	member->dtmf_frames_in = 0 ;
-	member->dtmf_frames_in_dropped = 0 ;
-	member->dtmf_frames_out = 0 ;
-	member->dtmf_frames_out_dropped = 0 ;
-#endif
-#ifdef	TEXT
-	member->text_frames_in = 0 ;
-	member->text_frames_in_dropped = 0 ;
-	member->text_frames_out = 0 ;
-	member->text_frames_out_dropped = 0 ;
-#endif
-	// for counting sequentially dropped frames
-	member->sequential_drops = 0 ;
-	member->since_dropped = 0 ;
-
-	// kick flag
-	member->kick_flag = 0;
-
-	// moh flags
-	member->moh_flag = 0;
-	member->moh_stop = 0;
 
 	// record start time
 	// init dropped frame timestamps
@@ -1219,17 +1089,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	// parse passed flags
 	//
 
-	// silence detection flags w/ defaults
-	member->vad_flag = 0 ;
-	member->denoise_flag = 0 ;
-	member->agc_flag = 0 ;
-
-	// is this member using the telephone?
-	member->via_telephone = 0 ;
-
-	// moh if only member flag
-	member->hold_flag = 0 ;
-	
 	// temp pointer to flags string
 	char* flags = member->flags ;
 
@@ -1344,9 +1203,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		}
 	}
 
-	// set the dsp to null so silence detection is disabled by default
-	member->dsp = NULL ;
-
 #if ( SILDET == 2 )
 	//
 	// configure silence detection and preprocessing
@@ -1433,7 +1289,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		case AST_FORMAT_SPEEX:
 			member->write_format_index = AC_SPEEX_INDEX;
 			break;
-
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->write_format_index = AC_G729A_INDEX;
@@ -1444,9 +1299,8 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->write_format_index = AC_G722_INDEX;
 			break;
 #endif
-
 		default:
-			member->write_format_index = 0 ;
+			break;
 	}
 
 	// index for converted_frames array
@@ -1475,7 +1329,6 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		case AST_FORMAT_SPEEX:
 			member->read_format_index = AC_SPEEX_INDEX;
 			break;
-
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->read_format_index = AC_G729A_INDEX;
@@ -1486,17 +1339,14 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->read_format_index = AC_G722_INDEX;
 			break;
 #endif
-
 		default:
-			member->read_format_index = 0 ;
+			break;
 	}
 
 	// smoother defaults.
-	member->smooth_multiple =1;
+	member->smooth_multiple = 1;
 	member->smooth_size_in = -1;
 	member->smooth_size_out = -1;
-	member->inSmoother= NULL;
-	member->outPacker= NULL;
 
 	switch (member->read_format){
 		/* these assumptions may be incorrect */
@@ -1538,8 +1388,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			break;
 #endif
 		default:
-			member->inSmoother = NULL; //don't use smoother for this type.
-			//DEBUG("smoother is NULL for member->read_format => %d\n", member->read_format) ;
+			break;
 	}
 
 	if (member->smooth_size_in > 0){
