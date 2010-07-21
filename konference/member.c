@@ -178,8 +178,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 #endif
 	if ((f->frametype == AST_FRAME_VOICE
 			&& (member->mute_audio == 1
-				|| (member->soundq != NULL && member->muted == 1)
-				)
+				|| member->muted == 1)
 			)
 #ifdef	VIDEO
 		|| (f->frametype == AST_FRAME_VIDEO
@@ -450,7 +449,6 @@ static int process_outgoing(struct ast_conf_member *member)
 			}
 		} else {
 			if (member->moh_flag) {
-				member->muted = 1;
 				member->ready_for_outgoing = 0;
 				delete_conf_frame( cf ) ;
 				ast_moh_start(member->chan, NULL, NULL);

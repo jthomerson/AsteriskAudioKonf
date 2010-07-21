@@ -532,7 +532,7 @@ char *conference_mutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_ar
 	    return FAILURE;
 	}
 
-	member->muted = member->mute_audio = 1;
+	member->mute_audio = 1;
 
 	if ( !--member->use_count && member->delete_flag )
 		ast_cond_signal ( &member->delete_var ) ;
@@ -745,7 +745,7 @@ char *conference_unmutechannel(struct ast_cli_entry *e, int cmd, struct ast_cli_
 	    return FAILURE;
 	}
 
-	member->muted = member->mute_audio = 0;
+	member->mute_audio = 0;
 
 	if ( !--member->use_count && member->delete_flag )
 		ast_cond_signal ( &member->delete_var ) ;

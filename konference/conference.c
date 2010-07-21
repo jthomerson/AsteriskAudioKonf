@@ -1646,7 +1646,7 @@ int mute_member (  const char* confname, int user_id)
 			    if (member->id == user_id)
 			      {
 				      ast_mutex_lock( &member->lock ) ;
-				      member->muted = member->mute_audio = 1;
+				      member->mute_audio = 1;
 				      ast_mutex_unlock( &member->lock ) ;
 					manager_event(
 						EVENT_FLAG_CALL,
@@ -1701,7 +1701,7 @@ int mute_conference (  const char* confname)
 			    if ( !member->ismoderator )
 			      {
 				      ast_mutex_lock( &member->lock ) ;
-				      member->muted = member->mute_audio = 1;
+				      member->mute_audio = 1;
 				      ast_mutex_unlock( &member->lock ) ;
 				      res = 1;
 			      }
@@ -1757,7 +1757,7 @@ int unmute_member (  const char* confname, int user_id)
 			    if (member->id == user_id)
 			      {
 				      ast_mutex_lock( &member->lock ) ;
-				      member->muted = member->mute_audio = 0;
+				      member->mute_audio = 0;
 				      ast_mutex_unlock( &member->lock ) ;
 					manager_event(
 						EVENT_FLAG_CALL,
@@ -1812,7 +1812,7 @@ int unmute_conference (  const char* confname)
 			    if ( !member->ismoderator )
 			      {
 				      ast_mutex_lock( &member->lock ) ;
-				      member->muted = member->mute_audio = 0;
+				      member->mute_audio = 0;
 				      ast_mutex_unlock( &member->lock ) ;
 				      res = 1;
 			      }
@@ -3042,6 +3042,9 @@ int stop_sound_channel(int fd, const char *channel)
 		sound->stopped = 1;
 		sound = next;
 	}
+
+		member->muted = 0;
+
 	if ( !--member->use_count && member->delete_flag )
 		ast_cond_signal ( &member->delete_var ) ;
 	ast_mutex_unlock(&member->lock);
@@ -3062,7 +3065,7 @@ int start_moh_channel(int fd, const char *channel)
 		return 0;
 	} else if (!member->norecv_audio && !member->moh_flag)
 	{
-		member->moh_flag = 1;
+		member->moh_flag = member->muted = 1;
 	}
 
 	if ( !--member->use_count && member->delete_flag )
