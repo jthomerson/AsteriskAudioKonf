@@ -170,7 +170,7 @@ int queue_frame_for_listener( struct ast_conference* conf, struct ast_conf_membe
 int queue_frame_for_speaker( struct ast_conference* conf, struct ast_conf_member* member, conf_frame* frame ) ;
 int queue_silent_frame( struct ast_conference* conf, struct ast_conf_member* member ) ;
 
-void remove_member( struct ast_conf_member* member, struct ast_conference* conf ) ;
+void remove_member( struct ast_conf_member* member, struct ast_conference* conf, char* conf_name ) ;
 
 #ifdef	TEXT
 int send_text_message_to_member(struct ast_conf_member *member, const char *text);

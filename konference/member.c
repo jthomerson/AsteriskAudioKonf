@@ -703,7 +703,7 @@ int member_exec( struct ast_channel* chan, void* data )
 			}
 			pbx_builtin_setvar_helper(member->chan, "KONFERENCE", "SPYFAILED" );
 			//DEBUG("Failed to start spyer %s, spyee is %s\n", member->chan->name, member->spyee_channel_name) ;
-			remove_member( member, conf ) ;
+			remove_member( member, conf, conf_name ) ;
 			return 0 ;
 		}
 	} 
@@ -867,7 +867,7 @@ int member_exec( struct ast_channel* chan, void* data )
 		//DEBUG("End spyer %s, spyee is %s\n", member->chan->name, member->spyee_channel_name) ;
 	}
 
-	remove_member( member, conf ) ;
+	remove_member( member, conf, conf_name ) ;
 	return 0 ;
 }
 

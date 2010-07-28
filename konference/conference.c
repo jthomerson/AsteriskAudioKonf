@@ -1069,7 +1069,7 @@ static void add_member( struct ast_conf_member *member, struct ast_conference *c
 	return ;
 }
 
-void remove_member( struct ast_conf_member* member, struct ast_conference* conf )
+void remove_member( struct ast_conf_member* member, struct ast_conference* conf, char* conf_name )
 {
 	int membercount ;
 	short moderators ;
@@ -1247,7 +1247,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		"Duration: %ld\r\n"
 		"Moderators: %d\r\n"
 		"Count: %d\r\n",
-		member->conf->name,
+		conf_name,
 		member->type,
 		member->chan->uniqueid,
 		member->id,
