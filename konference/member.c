@@ -398,6 +398,8 @@ again2:
 	free(toboot);
 	if(member->soundq) goto again;
 
+	member->muted = 0;
+
 	ast_mutex_unlock(&member->lock);
 
 	// if we get here, we've gotten to the end of the queue; reset write format
