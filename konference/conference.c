@@ -94,9 +94,13 @@ static void conference_exec( struct ast_conference *conf )
 	//DEBUG("Enter conference_exec\n") ;
 
 	// timer timestamps
+#ifdef	VIDEO
 	struct timeval base, curr, notify ;
 	base = notify = ast_tvnow();
-
+#else
+	struct timeval base, curr ;
+	base = ast_tvnow();
+#endif
 	// holds differences of curr and base
 	long time_diff = 0 ;
 	long time_sleep = 0 ;
@@ -511,32 +515,16 @@ static void conference_exec( struct ast_conference *conf )
 				send_frames = delete_conf_frame( send_frames ) ;
 			}
 
-			//
-			// notify the manager of state changes every 100 milliseconds
-			// we piggyback on this for VAD switching logic
-			//
-
+#ifdef	VIDEO
 			if ( ( ast_tvdiff_ms(curr, notify) / AST_CONF_NOTIFICATION_SLEEP ) >= 1 )
 			{
-#ifdef	VIDEO
 				// Do VAD switching logic
-				// We need to do this here since send_state_change_notifications
-				// resets the flags
 				if ( !conf->video_locked )
 					do_VAD_switching(conf);
-#endif
-				// send the notifications
-				send_state_change_notifications( conf->memberlist ) ;
-#ifdef  ONEMIXTHREAD
-				if ( !conf->next ) {
-					// increment the notification timer base
-					add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
-				}
-#else
 				// increment the notification timer base
 				add_milliseconds( &notify, AST_CONF_NOTIFICATION_SLEEP ) ;
-#endif
 			}
+#endif
 
 			// release conference lock
 			ast_rwlock_unlock( &conf->lock ) ;

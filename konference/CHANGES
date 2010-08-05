@@ -160,3 +160,8 @@ Removed channel and conference name strings from the member control block. The
 former can be referenced via the channel pointer in the member control block.
 The latter can be referenced via a pointer to conference control block which
 was added to the member contol block for this purpose.
+
+Changed the conference state event implementation so that speaking/silent
+notifications are generated in the member thread. The advantage of this
+approach is that it doesn't require the conference thread to periodically
+scan the member list for member state changes.

@@ -213,11 +213,13 @@ struct ast_conf_member
 	// used for determining need to mix frames
 	// and for management interface notification
 	// and for VAD based video switching
+#ifdef	VIDEO
 	short speaking_state_notify ;
 	short speaking_state ; // This flag will be true if this member or any of its drivers is speaking
-	short local_speaking_state; // This flag will be true only if this member is speaking
 	struct timeval last_state_change;
 	int speaker_count; // Number of drivers (including this member) that are speaking
+#endif
+	short local_speaking_state; // This flag will be true only if this member is speaking
 
 #ifdef	VIDEO
 	// Stuff used to determine video broadcast state
@@ -362,12 +364,10 @@ conf_frame* get_outgoing_dtmf_frame( struct ast_conf_member* member ) ;
 #ifdef	TEXT
 conf_frame* get_outgoing_text_frame( struct ast_conf_member* member ) ;
 #endif
-
-void send_state_change_notifications( struct ast_conf_member* member ) ;
-
+#ifdef	VIDEO
 int increment_speaker_count(struct ast_conf_member *member, int lock);
 int decrement_speaker_count(struct ast_conf_member *member, int lock);
-
+#endif
 void member_process_spoken_frames(struct ast_conference* conf,
 				  struct ast_conf_member *member,
 				  struct conf_frame **spoken_frames,

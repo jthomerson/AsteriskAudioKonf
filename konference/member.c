@@ -229,7 +229,18 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 					//DEBUG("ignore_speex_count => %d\n", member->ignore_speex_count) ;
 
 					// skip speex_preprocess(), and decrement counter
-					--member->ignore_speex_count ;
+					if (!--member->ignore_speex_count ) {
+						manager_event(
+							EVENT_FLAG_CALL,
+							"ConferenceState",
+							"Channel: %s\r\n"
+							"Flags: %s\r\n"
+							"State: %s\r\n",
+							member->chan->name,
+							member->flags,
+							"silent"
+						) ;
+					}
 				}
 				else
 				{
@@ -239,6 +250,18 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 			}
 			else
 			{
+				if (!member->ignore_speex_count) {
+					manager_event(
+						EVENT_FLAG_CALL,
+						"ConferenceState",
+						"Channel: %s\r\n"
+						"Flags: %s\r\n"
+						"State: %s\r\n",
+						member->chan->name,
+						member->flags,
+						"speaking"
+					) ;
+				}
 				// voice detected, reset skip count
 				member->ignore_speex_count = AST_CONF_SKIP_SPEEX_PREPROCESS ;
 			}
@@ -750,10 +773,6 @@ int member_exec( struct ast_channel* chan, void* data )
 
 	DEBUG("begin member event loop, channel => %s\n", chan->name) ;
 
-	// timer timestamps
-	struct timeval base, curr ;
-	base = ast_tvnow();
-
 	// tell conference_exec we're ready for frames
 	member->ready_for_outgoing = 1 ;
 	while ( 42 == 42 )
@@ -826,9 +845,6 @@ int member_exec( struct ast_channel* chan, void* data )
 		//-----------------//
 		// OUTGOING FRAMES //
 		//-----------------//
-
-		// update the current timestamps
-		curr = ast_tvnow();
 
 		if ( !process_outgoing(member) )
 			// back to process incoming frames
@@ -1083,8 +1099,10 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->time_entered =
 		member->last_in_dropped =
 		member->last_out_dropped =
-		member->last_state_change = ast_tvnow();
-
+#ifdef	VIDEO
+		member->last_state_change =
+#endif
+		ast_tvnow();
 	//
 	// parse passed flags
 	//
@@ -2675,43 +2693,6 @@ int queue_outgoing_text_frame( struct ast_conf_member* member, const struct ast_
 #endif
 
 //
-// manager functions
-//
-
-void send_state_change_notifications( struct ast_conf_member* member )
-{
-	//DEBUG("sending state change notification\n") ;
-
-	// loop through list of members, sending state changes
-	while ( member != NULL )
-	{
-		// has the state changed since last time through this loop?
-		if ( member->speaking_state_notify )
-		{
-			manager_event(
-				EVENT_FLAG_CALL,
-				"ConferenceState",
-				"Channel: %s\r\n"
-				"Flags: %s\r\n"
-				"State: %s\r\n",
-				member->chan->name,
-				member->flags,
-				( ( member->speaking_state == 1 ) ? "speaking" : "silent" )
-			) ;
-
-			DEBUG("member state changed, channel => %s, state => %d, incoming => %d, outgoing => %d\n", member->chan->name, member->speaking_state, member->inFramesCount, member->outFramesCount) ;
-
-			member->speaking_state_notify = 0;
-		}
-
-		// move the pointer to the next member
-		member = member->next ;
-	}
-
-	return ;
-}
-
-//
 // ast_packer, adapted from ast_smoother
 // pack multiple frames together into one packet on the wire.
 //
@@ -3228,7 +3209,7 @@ void member_process_outgoing_frames(struct ast_conference* conf,
 	}
 	ast_mutex_unlock(&member->lock);
 }
-
+#ifdef	VIDEO
 // Functions that will increase and decrease speaker_count in a secure way, locking the member mutex if required
 // Will also set speaking_state flag.
 // Returns the previous speaking state
@@ -3285,7 +3266,7 @@ int decrement_speaker_count(struct ast_conf_member *member, int lock)
 
 	return old_state;
 }
-
+#endif
 void member_process_spoken_frames(struct ast_conference* conf,
 				 struct ast_conf_member *member,
 				 struct conf_frame **spoken_frames,
@@ -3323,15 +3304,14 @@ void member_process_spoken_frames(struct ast_conference* conf,
 		// decrement only on state transitions
 		if ( member->local_speaking_state == 1 )
 		{
-			decrement_speaker_count(member, 0);
 			member->local_speaking_state = 0;
-			// If we're driving another member, decrement its speaker count as well
 #ifdef	VIDEO
+			decrement_speaker_count(member, 0);
+			// If we're driving another member, decrement its speaker count as well
 			if ( member->driven_member != NULL )
 				decrement_speaker_count(member->driven_member, 1);
 #endif
 		}
-
 		// count the listeners
 		(*listener_count)++ ;
 	}
@@ -3347,21 +3327,19 @@ void member_process_spoken_frames(struct ast_conference* conf,
 
 		// point the list at the new frame
 		*spoken_frames = cfr ;
-
 		// Increment speaker count for us and for driven members
 		// This happens only on the first received frame, since we want to
 		// increment only on state transitions
 		if ( member->local_speaking_state == 0 )
 		{
-			increment_speaker_count(member, 0);
 			member->local_speaking_state = 1;
 #ifdef	VIDEO
+			increment_speaker_count(member, 0);
 			// If we're driving another member, increment its speaker count as well
 			if ( member->driven_member != NULL )
 				increment_speaker_count(member->driven_member, 1);
 #endif
 		}
-
 		// count the speakers
 		(*speaker_count)++ ;
 	}
