@@ -165,3 +165,6 @@ Changed the conference state event implementation so that speaking/silent
 notifications are generated in the member thread. The advantage of this
 approach is that it doesn't require the conference thread to periodically
 scan the member list for member state changes.
+
+Changed "x" option so that all members are kicked and the conference ends when
+the last moderator leaves the conference.

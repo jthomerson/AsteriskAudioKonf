@@ -1150,7 +1150,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			case 'l':
 				member->norecv_audio = 1;
 				break;
-
+#if ( SILDET == 2 )
 				// speex preprocessing options
 			case 'V':
 				member->vad_flag = 1 ;
@@ -1161,7 +1161,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			case 'A':
 				member->agc_flag = 1 ;
 				break ;
-
+#endif
 				// dtmf/moderator/video switching options
 #ifdef	VIDEO
 			case 'X':
@@ -1203,14 +1203,14 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			case 'x':
 				member->kick_conferees = 1;
 				break;
-
+#if ( SILDET == 2 )
 				//Telephone connection
 			case 'a':
 				member->vad_flag = 1 ;
 			case 'T':
 				member->via_telephone = 1;
 				break;
-
+#endif
 			case 'H':
 				member->hold_flag = 1;
 				break;
@@ -1258,13 +1258,16 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 
 	// set member's audio formats, taking dsp preprocessing into account
 	// ( chan->nativeformats, AST_FORMAT_SLINEAR, AST_FORMAT_ULAW, AST_FORMAT_GSM )
+#if ( SILDET == 2 )
 #ifndef	AC_USE_G722
 	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR ;
 #else
 	member->read_format = ( member->dsp == NULL ) ? chan->nativeformats : AST_FORMAT_SLINEAR16 ;
 #endif
+#else
+	member->read_format = chan->nativeformats ;
+#endif
 	member->write_format = chan->nativeformats;
-
 	// 1.2 or 1.3+
 #ifdef AST_FORMAT_AUDIO_MASK
 
@@ -1683,7 +1686,9 @@ conf_frame* get_incoming_dtmf_frame( struct ast_conf_member *member )
 
 conf_frame* get_incoming_frame( struct ast_conf_member *member )
 {
+#ifdef AST_CONF_CACHE_LAST_FRAME
 	conf_frame *cf_result;
+#endif
 #ifdef	APP_KONFERENCE_DEBUG
 	//
 	// sanity checks

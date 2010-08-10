@@ -19,7 +19,7 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	'V' : enable speex preprocessing Voice Activity Detection 
 	'D' : enable speex preprocessing De-noise
 	'A' : enable speex preprocessing Automatic Gain Control
-	'T' : member connects through Zaptel, so speex preprocessing should be enabled
+	'T' : telephone, so speex preprocessing should be enabled
 
 	DTMF options:
 	'X' : enable DTMF switch: video can be switched by users using DTMF. Do not use with 'S'.
@@ -37,7 +37,7 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	Miscellaneous:
 	't' : member accepts text based control messages.  The messages are described in a separate document
 	'N' : Assume that the member starts off with camera disabled.
-	'x' : if a moderator leaves, all conferees are kicked and conference ends.
+	'x' : when the last moderator leaves, all conferees are kicked and conference ends.
 	'a' : V + T
 	'H' : play music on hold if only one member in conference
 

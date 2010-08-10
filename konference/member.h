@@ -67,13 +67,13 @@ struct ast_conf_member
 	char *type ;		// conference type
 	char *spyee_channel_name ; // spyee  channel name
 	int max_users ; // zero or max users for this conference
-
+#if ( SILDET == 2 )
 	// voice flags
 	int vad_flag;
 	int denoise_flag;
 	int agc_flag;
 	int via_telephone;
-
+#endif
 	// video conference params
 	int id;
 #ifdef	VIDEO
@@ -147,12 +147,12 @@ struct ast_conf_member
 #ifdef	VIDEO
 	unsigned int inVideoFramesNeeded ;
 #endif
-
+#ifdef	AST_CONF_CACHE_LAST_FRAME
 	// used when caching last frame
 	conf_frame* inFramesLast ;
 	unsigned int inFramesRepeatLast ;
 	unsigned short okayToCacheLast ;
-
+#endif
 	// LL output frame queue
 	conf_frame* outFrames ;
 	conf_frame* outFramesTail ;
@@ -287,9 +287,6 @@ struct ast_conf_member
 	SpeexPreprocessState *dsp ;
         // number of frames to ignore speex_preprocess()
 	int ignore_speex_count;
-#else
-	// placeholder when preprocessing is not enabled
-	void* dsp ;
 #endif
 
 	// audio format this member is using
