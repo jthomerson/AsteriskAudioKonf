@@ -2894,14 +2894,10 @@ int queue_frame_for_listener(
 
 	for ( ; frame != NULL ; frame = frame->next )
 	{
-		// we're looking for a null or matching member
-		if ( frame->member != NULL && frame->member != member )
+		// look for the listener's frame
+		if ( frame->member != NULL )
 			continue ;
 
-		// if this member is a spyer, only queue frames from the spyee
-		if ( ( member->spyee_channel_name != NULL && frame->member == NULL )
-			&& ( frame->spy_partner == NULL || frame->spy_partner != member ) )
-			continue ;
 #ifdef	APP_KONFERENCE_DEBUG
 		if ( frame->fr == NULL )
 		{
@@ -2910,7 +2906,7 @@ int queue_frame_for_listener(
 		}
 #endif
 		// first, try for a pre-converted frame
-		qf = (member->listen_volume == 0 && member->spy_partner == NULL? frame->converted[ member->write_format_index ] : 0);
+		qf = (member->listen_volume == 0 ? frame->converted[member->write_format_index] : 0);
 
 		// convert ( and store ) the frame
 		if ( qf == NULL )
@@ -2955,7 +2951,7 @@ int queue_frame_for_listener(
 				//qf = NULL ;
 			}
 
-			if (member->listen_volume != 0 || member->spy_partner != NULL)
+			if ( member->listen_volume != 0 )
 			{
 				// free frame ( the translator's copy )
 				ast_frfree( qf ) ;
@@ -3189,29 +3185,49 @@ void member_process_outgoing_frames(struct ast_conference* conf,
 	ast_mutex_lock(&member->lock);
 
 	// skip members that are not ready
-	if ( member->ready_for_outgoing == 0 )
+	// skip no receive audio clients
+	if ( member->ready_for_outgoing == 0 || member->norecv_audio == 1 )
 	{
 		ast_mutex_unlock(&member->lock);
 		return ;
 	}
 
-	// skip no receive audio clients
-	if ( member->norecv_audio )
+	if ( member->spy_partner == 0 )
 	{
-		ast_mutex_unlock(&member->lock);
-		return;
-	}
-
-	if ( member->local_speaking_state == 0 )
-	{
-		// queue listener frame
-		queue_frame_for_listener( conf, member, send_frames ) ;
+		// neither a spyer nor a spyee
+		if ( member->local_speaking_state == 0 ) 
+		{
+			// queue listener frame
+			queue_frame_for_listener( conf, member, send_frames ) ;
+		}
+		else
+		{
+			// queue speaker frame
+			queue_frame_for_speaker( conf, member, send_frames ) ;
+		}
 	}
 	else
 	{
-		// queue speaker frame
-		queue_frame_for_speaker( conf, member, send_frames ) ;
+		// either a spyer or a spyee
+		if ( member->spyee_channel_name != NULL )
+		{
+			// spyer -- always use member translator
+			queue_frame_for_speaker( conf, member, send_frames ) ;
+		}
+		else
+		{
+			// spyee -- use member translator if spyee speaking or spyer whispering to spyee
+			if ( member->local_speaking_state == 1 || member->spy_partner->local_speaking_state == 1 )
+			{
+				queue_frame_for_speaker( conf, member, send_frames ) ;
+			}
+			else
+			{
+				queue_frame_for_listener( conf, member, send_frames ) ;
+			}
+		}
 	}
+
 	ast_mutex_unlock(&member->lock);
 }
 #ifdef	VIDEO

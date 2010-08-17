@@ -102,26 +102,43 @@ conf_frame* mix_single_speaker( conf_frame* frames_in, int volume )
 	frames_in->converted[ frames_in->member->read_format_index ] = ast_frdup( frames_in->fr ) ;
 
 	// convert frame to slinear, if we have a path
-	frames_in->fr = convert_frame_to_slinear(
-		frames_in->member->to_slinear,
-		frames_in->fr
-	) ;
+	if (!(frames_in->fr = convert_frame_to_slinear( frames_in->member->to_slinear, frames_in->fr)))
+	{
+		ast_log( LOG_WARNING, "mix_single_speaker: unable to convert frame to slinear\n" ) ;
+		return frames_in ;
+	}
 
 	if ( (frames_in->member->talk_volume != 0) || (volume != 0) )
 	{
 		ast_frame_adjust_volume(frames_in->fr, frames_in->member->talk_volume + volume);
 	}
 
-	if ( frames_in->member->spyee_channel_name == NULL )
+	if (!frames_in->member->spy_partner)
 	{
-		// set frame's spy partner
-		frames_in->spy_partner = frames_in->member->spy_partner ;
-
+		// speaker is neither a spyee nor a spyer
 		// set the frame's member to null ( i.e. all listeners )
 		frames_in->member = NULL ;
 	}
 	else
-		frames_in->member = frames_in->member->spy_partner ;
+	{
+		// speaker is either a spyee or a spyer
+		if ( frames_in->member->spyee_channel_name == NULL )
+		{
+			conf_frame *spy_frame = copy_conf_frame(frames_in);
+
+			if ( spy_frame != 0 )
+			{
+				frames_in->next = spy_frame;
+				spy_frame->prev = frames_in;
+
+				spy_frame->member = frames_in->member->spy_partner;
+			}
+
+			frames_in->member = NULL ;
+		}
+		else
+			frames_in->member = frames_in->member->spy_partner ;
+	}
 
 	return frames_in ;
 }
@@ -227,21 +244,18 @@ conf_frame* mix_multiple_speakers(
 		else
 		{
 			//DEBUG("converting frame to slinear, channel => %s\n", cf_spoken->member->channel_name) ;
-			cf_spoken->fr = convert_frame_to_slinear(
-				cf_spoken->member->to_slinear,
-				cf_spoken->fr
-			) ;
+			if ( !(cf_spoken->fr = convert_frame_to_slinear( cf_spoken->member->to_slinear, cf_spoken->fr)) )
+			{
+				ast_log( LOG_WARNING, "mix_multiple_speakers: unable to convert frame to slinear\n" ) ;
+				continue;
+			}
 
 			if (( cf_spoken->member->talk_volume != 0 ) || (volume != 0))
 			{
 				ast_frame_adjust_volume(cf_spoken->fr, cf_spoken->member->talk_volume + volume);
 			}
 
-			if ( cf_spoken->fr == NULL )
-			{
-				ast_log( LOG_WARNING, "unable to convert frame to slinear\n" ) ;
-			}
-			else if ( cf_spoken->member->spyee_channel_name == NULL )
+			if ( cf_spoken->member->spyee_channel_name == NULL )
 			{
 				// create new conf frame with last frame as 'next'
 				cf_sendFrames = create_conf_frame( cf_spoken->member, cf_sendFrames, NULL ) ;
@@ -525,8 +539,6 @@ conf_frame* create_conf_frame( struct ast_conf_member* member, conf_frame* next,
 
 	cf->member = member ;
 	// cf->priority = 0 ;
-
-	cf->spy_partner = NULL ;
 
 	cf->prev = NULL ;
 	cf->next = next ;
