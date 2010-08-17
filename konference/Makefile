@@ -86,7 +86,7 @@ CPPFLAGS += -DCONFERENCE_TABLE_SIZE=$(CONFERENCE_TABLE_SIZE)
 CPPFLAGS += -DONEMIXTHREAD
 
 #
-# Uncomment this if you want G.729A support (need to have the actual codec installed
+# Uncomment this if you want G.729A support (need to have the actual codec installed)
 #
 # CPPFLAGS += -DAC_USE_G729A
 
@@ -94,6 +94,11 @@ CPPFLAGS += -DONEMIXTHREAD
 # Uncomment this if you want G.722 support (requires asterisk 1.6)
 #
 # CPPFLAGS += -DAC_USE_G722
+
+#
+# Uncomment this if you want SPEEX support (need to have the actual codec installed)
+#
+# CPPFLAGS += -DAC_USE_SPEEX
 
 ifeq ($(APP_KONFERENCE_DEBUG), 1)
 CPPFLAGS += -DAPP_KONFERENCE_DEBUG

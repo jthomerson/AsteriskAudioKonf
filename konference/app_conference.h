@@ -229,7 +229,9 @@
 		AC_ULAW_INDEX,
 		AC_ALAW_INDEX,
 		AC_GSM_INDEX,
+#ifdef	AC_USE_SPEEX
 		AC_SPEEX_INDEX,
+#endif
 #ifdef	AC_USE_G729A
 		AC_G729A_INDEX,
 #endif

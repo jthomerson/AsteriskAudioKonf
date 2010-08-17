@@ -168,3 +168,6 @@ scan the member list for member state changes.
 
 Changed "x" option so that all members are kicked and the conference ends when
 the last moderator leaves the conference.
+
+Added a Makefile variable AC_USE_SPEEX. The default value is undefined, that
+is, the SPEEX codec is not available.

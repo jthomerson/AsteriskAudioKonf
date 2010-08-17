@@ -1306,10 +1306,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		case AST_FORMAT_GSM:
 			member->write_format_index = AC_GSM_INDEX ;
 			break ;
-
+#ifdef	AC_USE_SPEEX
 		case AST_FORMAT_SPEEX:
 			member->write_format_index = AC_SPEEX_INDEX;
 			break;
+#endif
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->write_format_index = AC_G729A_INDEX;
@@ -1346,10 +1347,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		case AST_FORMAT_GSM:
 			member->read_format_index = AC_GSM_INDEX ;
 			break ;
-
+#ifdef	AC_USE_SPEEX
 		case AST_FORMAT_SPEEX:
 			member->read_format_index = AC_SPEEX_INDEX;
 			break;
+#endif
 #ifdef AC_USE_G729A
 		case AST_FORMAT_G729A:
 			member->read_format_index = AC_G729A_INDEX;
