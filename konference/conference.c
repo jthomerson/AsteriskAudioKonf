@@ -1312,6 +1312,9 @@ int get_conference_count( void )
 
 int show_conference_stats ( int fd )
 {
+	int duration;
+	char duration_str[10];
+
         // no conferences exist
 	if ( conflist == NULL )
 	{
@@ -1324,12 +1327,14 @@ int show_conference_stats ( int fd )
 
 	struct ast_conference *conf = conflist ;
 
-	ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s\n", "Name", "Members", "Volume", "Bucket" ) ;
+	ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s\n", "Name", "Members", "Volume", "Duration" ) ;
 
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		ast_cli( fd, "%-20.20s %-20d %-20d %-20ld\n", conf->name, conf->membercount, conf->volume, conf->bucket - conference_table ) ;
+		duration = (int)(ast_tvdiff_ms(ast_tvnow(),conf->stats.time_entered) / 1000);
+		snprintf(duration_str, 10, "%02d:%02d:%02d",  duration / 3600, (duration % 3600) / 60, duration % 60);
+		ast_cli( fd, "%-20.20s %-20d %-20d %-20.20s\n", conf->name, conf->membercount, conf->volume, duration_str ) ;
 		conf = conf->next ;
 	}
 
@@ -1344,6 +1349,8 @@ int show_conference_list ( int fd, const char *name )
 	struct ast_conf_member *member;
 	char volume_str[10];
 	char spy_str[10];
+	int duration;
+	char duration_str[10];
 
         // no conferences exist
 	if ( conflist == NULL )
@@ -1367,9 +1374,9 @@ int show_conference_list ( int fd, const char *name )
 
 			// ast_cli(fd, "Chat mode is %s\n", conf->chat_mode_on ? "ON" : "OFF");
 #ifdef	VIDEO
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Bucket", "Spy", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Driver #", "Duration", "Spy", "Channel");
 #else
-			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Bucket", "Spy", "Channel");
+			ast_cli( fd, "%-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80.20s\n", "User #", "Flags", "Audio", "Volume", "Duration", "Spy", "Channel");
 #endif
 			// do the biz
 			member = conf->memberlist ;
@@ -1380,18 +1387,20 @@ int show_conference_list ( int fd, const char *name )
 					snprintf(spy_str, 10, "%d", member->spy_partner->id);
 				else
 					strcpy(spy_str , "*");
+				duration = (int)(ast_tvdiff_ms(ast_tvnow(),member->time_entered) / 1000);
+				snprintf(duration_str, 10, "%02d:%02d:%02d",  duration / 3600, (duration % 3600) / 60, duration % 60);
 #ifdef	VIDEO
 				if ( member->driven_member == NULL )
 				{
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", member->bucket - channel_table, spy_str, member->chan->name);
+					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80s\n",
+					member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, "*", duration_str, spy_str, member->chan->name);
 				} else {
-					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d  %-20ld %-20.20s %-80s\n", member->id, member->flags,
-					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, member->bucket - channel_table, spy_str, member->chan->name);
+					ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20d  %-20.20s %-20.20s %-80s\n", member->id, member->flags,
+					(member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->driven_member->id, duration_str, spy_str, member->chan->name);
 				}
 #else
-				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20ld %-20.20s %-80s\n",
-				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, member->bucket - channel_table, spy_str, member->chan->name);
+				ast_cli( fd, "%-20d %-20.20s %-20.20s %-20.20s %-20.20s %-20.20s %-80s\n",
+				member->id, member->flags, (member->mute_audio == 0 ? "Unmuted" : "Muted"), volume_str, duration_str , spy_str, member->chan->name);
 #endif
 				member = member->next;
 			}

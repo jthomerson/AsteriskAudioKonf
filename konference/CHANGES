@@ -171,3 +171,8 @@ the last moderator leaves the conference.
 
 Added a Makefile variable AC_USE_SPEEX. The default value is undefined, that
 is, the SPEEX codec is not available.
+
+Changed the format of the conference list command. Specifically, removed the
+bucket field and added a duration field. The duration field indicates either
+the conference elapsed time when conferences are listed or the member elapsed
+time when members are listed.
