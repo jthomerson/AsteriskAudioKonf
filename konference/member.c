@@ -755,12 +755,11 @@ int member_exec( struct ast_channel* chan, void* data )
 	//
 
 	conf = join_conference( member, recfile, recformat ) ;
-
 	if ( conf == NULL )
 	{
 		ast_log( LOG_NOTICE, "unable to setup member conference %s\n", member->conf_name) ;
 		delete_member( member) ;
-		return -1;
+		return 0;
 	}
 
 	//
