@@ -829,6 +829,21 @@ int member_exec( struct ast_channel* chan, void* data )
 	) ;
 
 	//
+	// play welcome prompt
+	//
+	if (member->welcome_prompt) {
+		ast_stopstream(chan);
+		res = ast_streamfile(chan, member->welcome_prompt, chan->language);
+		if (!res) {
+			res = ast_waitstream(chan, "");
+			ast_stopstream(chan);
+		} else {
+			ast_log(LOG_WARNING, "Failed to play welcome prompt '%s' on channel '%s'",
+				member->welcome_prompt, chan->name);
+		}
+	}
+
+	//
 	// process loop for new member ( this runs in it's own thread )
 	//
 
@@ -1064,6 +1079,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 	member->max_users = AST_CONF_MAX_USERS;
 	member->type = NULL;
 	member->spyee_channel_name = NULL;
+	member->welcome_prompt = NULL;
 
 	//
 	// initialize member with passed data values
@@ -1117,6 +1133,7 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 		static const char arg_max_users[] = "max_users";
 		static const char arg_conf_type[] = "type";
 		static const char arg_chanspy[] = "spy";
+		static const char arg_welcomeprompt[] = "welcome_prompt";
 
 		char *value = token;
 		const char *key = strsep(&value, "=");
@@ -1162,6 +1179,11 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 			member->spyee_channel_name = malloc( strlen( value ) + 1 ) ;
 			strcpy( member->spyee_channel_name, value ) ;
 			DEBUG("spyee channel name is %s\n", member->spyee_channel_name) ;
+		} else if ( strncasecmp(key, arg_welcomeprompt, sizeof(arg_welcomeprompt) - 1) == 0 )
+		{
+			member->welcome_prompt = malloc( strlen( value ) + 1 ) ;
+			strcpy( member->welcome_prompt, value ) ;
+			DEBUG("welcome prompt is %s\n", member->welcome_prompt) ;
 		} else
 		{
 			ast_log(LOG_WARNING, "unknown parameter %s with value %s\n", key, value) ;
@@ -1728,6 +1750,9 @@ struct ast_conf_member* delete_member( struct ast_conf_member* member )
 
 	// free the member's copy of the spyee channel name
 	free(member->spyee_channel_name);
+
+	// free the welcome prompt
+	free(member->welcome_prompt);
 
 	// clear all sounds
 	struct ast_conf_soundq *sound = member->soundq;

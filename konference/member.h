@@ -69,6 +69,7 @@ struct ast_conf_member
 	char *type ;		// conference type
 	char* conf_name ;		// name of the conference that own this member
 	char *spyee_channel_name ; // spyee  channel name
+	char *welcome_prompt ;
 	int max_users ; // zero or max users for this conference
 
 	// voice flags

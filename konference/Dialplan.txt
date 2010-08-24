@@ -64,6 +64,7 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	max_users=<int> : Limit conference participants to max_users
 	type=<string>: Type identifier
 	spy=<string>: Channel name to spy
+	welcome_prompt=<string>: File to playback after a successful join (PIN verified), but before connecting conference audio
 
 	3. Examples
 
