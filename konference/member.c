@@ -1207,10 +1207,10 @@ struct ast_conf_member* create_member( struct ast_channel *chan, const char* dat
 				//Telephone connection
 			case 'a':
 				member->vad_flag = 1 ;
+#endif
 			case 'T':
 				member->via_telephone = 1;
 				break;
-#endif
 			case 'H':
 				member->hold_flag = 1;
 				break;

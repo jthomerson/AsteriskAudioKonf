@@ -72,8 +72,8 @@ struct ast_conf_member
 	int vad_flag;
 	int denoise_flag;
 	int agc_flag;
-	int via_telephone;
 #endif
+	int via_telephone;
 	// video conference params
 	int id;
 #ifdef	VIDEO

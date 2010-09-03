@@ -15,11 +15,11 @@ exten => <ext>,<pri>,Konference(<confname>,<flags>,<optional args>,<more optiona
 	'L' : member starts with audio muted
 	'l' : member starts unable to receive audio
 
-	Speex preprocessing options (right now app_konference does preprocessing only for Zaptel members):
-	'V' : enable speex preprocessing Voice Activity Detection 
-	'D' : enable speex preprocessing De-noise
-	'A' : enable speex preprocessing Automatic Gain Control
-	'T' : telephone, so speex preprocessing should be enabled
+	Speex preprocessing options (SILDET=2)
+	'T' : telephone, enable speex preprocessing
+	'V' : enable Voice Activity Detection 
+	'D' : enable De-noise
+	'A' : enable Automatic Gain Control
 
 	DTMF options:
 	'X' : enable DTMF switch: video can be switched by users using DTMF. Do not use with 'S'.

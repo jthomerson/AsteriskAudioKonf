@@ -101,11 +101,11 @@ conf_frame* mix_single_speaker( conf_frame* frames_in, int volume )
 	// copy orignal frame to converted array so listeners don't need to re-encode it
 	frames_in->converted[ frames_in->member->read_format_index ] = ast_frdup( frames_in->fr ) ;
 
-	// convert frame to slinear, if we have a path
+	// convert frame to slinear; otherwise, drop the frame
 	if (!(frames_in->fr = convert_frame_to_slinear( frames_in->member->to_slinear, frames_in->fr)))
 	{
 		ast_log( LOG_WARNING, "mix_single_speaker: unable to convert frame to slinear\n" ) ;
-		return frames_in ;
+		return NULL ;
 	}
 
 	if ( (frames_in->member->talk_volume != 0) || (volume != 0) )

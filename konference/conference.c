@@ -1213,7 +1213,7 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf,
 #endif
 	ast_rwlock_unlock( &conf->lock );
 
-	DEBUG("removed member from conference, name => %s, remaining => %d\n", member->conf_name, membercount) ;
+	DEBUG("removed member from conference, name => %s, remaining => %d\n", conf_name, membercount) ;
 
 	// remove member from channel table
 	if ( member->bucket != NULL )
