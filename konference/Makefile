@@ -83,7 +83,13 @@ CFLAGS += -fPIC
 CPPFLAGS += -DCRYPTO
 CPPFLAGS += -DCHANNEL_TABLE_SIZE=$(CHANNEL_TABLE_SIZE)
 CPPFLAGS += -DCONFERENCE_TABLE_SIZE=$(CONFERENCE_TABLE_SIZE)
-CPPFLAGS += -DONEMIXTHREAD
+# NOTE: In AsteriskAudioKonf, we disable the ONEMIXTHREAD "feature"
+#   It conflicts with the recording feature we added since the fork of app_konference
+#   If you have the single mixing thread enabled, start one conference recording, and
+#   one not recording, Asterisk dies.  The recording feature could be updated to work
+#   with the single mixing thread, but we want to take advantage of multi-core
+#   processors, so we just disable the single thread setting here:
+#CPPFLAGS += -DONEMIXTHREAD
 
 #
 # Uncomment this if you want G.729A support (need to have the actual codec installed
