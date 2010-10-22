@@ -109,15 +109,23 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 						{
 							DEBUG( "muting member\n" );
 							member->mute_audio = 1;
+							if (member->moh_flag)
+								ast_moh_stop(member->chan);
 							if (!ast_streamfile(member->chan, "conf-muted", member->chan->language))
 								ast_waitstream(member->chan, "");
+							if (member->moh_flag)
+								ast_moh_start(member->chan, NULL, NULL);
 						}
 						else if (member->mute_audio == 1)
 						{
 							DEBUG( "unmuting member\n" );
 							member->mute_audio = 0;
+							if (member->moh_flag)
+								ast_moh_stop(member->chan);
 							if (!ast_streamfile(member->chan, "conf-unmuted", member->chan->language))
 								ast_waitstream(member->chan, "");
+							if (member->moh_flag)
+								ast_moh_start(member->chan, NULL, NULL);
 						}
 						break;
 					case '2' :
