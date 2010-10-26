@@ -29,6 +29,7 @@
  */
 
 #include "asterisk/autoconfig.h"
+#include "asterisk/version.h"
 #include "conference.h"
 #include "asterisk/utils.h"
 #include "asterisk/file.h"
@@ -37,6 +38,7 @@
 #include "asterisk/say.h"
 
 #include "asterisk/musiconhold.h"
+
 
 //
 // static variables
@@ -64,6 +66,7 @@ static void add_member(struct ast_conf_member* member, struct ast_conference* co
 static int get_new_id(struct ast_conference *conf);
 static int update_member_broadcasting(struct ast_conference *conf, struct ast_conf_member *member, struct conf_frame *cfr, struct timeval time);
 #endif
+
 
 //
 // main conference function
@@ -1336,8 +1339,8 @@ void remove_member( struct ast_conf_member* member, struct ast_conference* conf 
 		member->id,
 		member->flags,
 		member->channel_name,
-		member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
-		member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown",
+		ast_channel_callerid_number(member->chan),
+		ast_channel_callerid_name(member->chan),
 		tt,
 		moderators,
 		membercount
@@ -1420,7 +1423,9 @@ int show_conference_stats ( int fd )
 	// loop through conf list
 	while ( conf != NULL )
 	{
-		ast_cli( fd, "%-20.20s %-20d %-20d %-20ld\n", conf->name, conf->membercount, conf->volume, conf->bucket - conference_table ) ;
+		ast_cli(fd, "%-20.20s %-20d %-20d %-20d\n",
+			conf->name, conf->membercount, conf->volume,
+			(int)(conf->bucket - conference_table) ) ;
 		conf = conf->next ;
 	}
 
@@ -1475,14 +1480,30 @@ int show_conference_list ( int fd, const char *name )
 				if ( member->driven_member == NULL )
 				{
 					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Channel: %-80s\n",
-					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, member->channel_name);
+						member->id,
+						ast_channel_callerid_name(member->chan),
+						ast_channel_callerid_number(member->chan),
+						(member->mute_audio == 0 ? "False" : "True"),
+						member->uniqueid, member->conf_name, member->channel_name);
 				} else {
 					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Speaking: %s Channel: %-80s\n",
-					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, (( member->speaking_state == 1 ) ? "True" : "False"), member->channel_name);
+						member->id,
+						ast_channel_callerid_name(member->chan),
+						ast_channel_callerid_number(member->chan),
+						(member->mute_audio == 0 ? "False" : "True"),
+						member->uniqueid, member->conf_name,
+						(( member->speaking_state == 1 ) ? "True" : "False"),
+						member->channel_name);
 				}
 #else
-					ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Speaking: %s Channel: %-80s\n",
-					member->id, (member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown"), (member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown"), (member->mute_audio == 0 ? "False" : "True"), member->uniqueid, member->conf_name, (( member->speaking_state == 1 ) ? "True" : "False"), member->channel_name);
+				ast_cli( fd, "MemberId: %-20d CIDName: %-20.20s CID: %-20.20s Muted: %-20.20s UniqueID: %-20.20s ConfName: %-20.20s Speaking: %s Channel: %-80s\n",
+					member->id,
+					ast_channel_callerid_name(member->chan),
+					ast_channel_callerid_number(member->chan),
+					(member->mute_audio == 0 ? "False" : "True"),
+					member->uniqueid, member->conf_name,
+					(( member->speaking_state == 1 ) ? "True" : "False"),
+					member->channel_name);
 #endif
 				member = member->next;
 			}
@@ -1551,8 +1572,8 @@ int manager_conference_list( struct mansession *s, const struct message *m )
 						conf->name,
 						member->id,
 						member->channel_name,
-						member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
-						member->chan->cid.cid_name ? member->chan->cid.cid_name : "unknown",
+						ast_channel_callerid_number(member->chan),
+						ast_channel_callerid_name(member->chan),
 						member->mute_audio ? "YES" : "NO",
 #ifdef	VIDEO
 						member->mute_video ? "YES" : "NO",
@@ -3315,7 +3336,7 @@ int hash(const char *name)
 	return h;
 }
 
-int count_exec( struct ast_channel* chan, void* data )
+int count_exec( struct ast_channel* chan, const char* data )
 {
 	int res = 0;
 	struct ast_conference *conf;

@@ -308,8 +308,8 @@ struct ast_conf_member
 #endif
 
 	// audio format this member is using
-	int write_format ;
-	int read_format ;
+	format_t write_format ;
+	format_t read_format ;
 
 	int write_format_index ;
 	int read_format_index ;
@@ -336,7 +336,7 @@ struct conf_member
 // function declarations
 //
 
-int member_exec( struct ast_channel* chan, void* data ) ;
+int member_exec( struct ast_channel* chan, const char* data ) ;
 
 struct ast_conf_member* check_active_video( int id, struct ast_conference *conf );
 

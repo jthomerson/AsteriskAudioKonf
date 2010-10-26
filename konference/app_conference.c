@@ -59,7 +59,13 @@ static char *app2 = "KonferenceCount";
 static char *synopsis2 = "Channel Independent Conference Count";
 static char *descrip2 = "Channel Independent Conference Count Application";
 
-static int app_konference_main(struct ast_channel* chan, void* data)
+#if ASTERISK_VERSION_NUM >= 10800
+typedef const char *ast_application_parameter;
+#else
+typedef void *ast_application_parameter;
+#endif
+
+static int app_konference_main(struct ast_channel* chan, ast_application_parameter data)
 {
 	int res ;
 	struct ast_module_user *u ;
@@ -67,14 +73,14 @@ static int app_konference_main(struct ast_channel* chan, void* data)
 	u = ast_module_user_add(chan);
 
 	// call member thread function
-	res = member_exec( chan, data ) ;
+	res = member_exec(chan, (const char*) data);
 
 	ast_module_user_remove(u);
 
 	return res ;
 }
 
-static int app_konferencecount_main(struct ast_channel* chan, void* data)
+static int app_konferencecount_main(struct ast_channel* chan, ast_application_parameter data)
 {
 	int res ;
 	struct ast_module_user *u ;
@@ -82,7 +88,7 @@ static int app_konferencecount_main(struct ast_channel* chan, void* data)
 	u = ast_module_user_add(chan);
 
 	// call count thread function
-	res = count_exec( chan, data ) ;
+	res = count_exec(chan, (const char *) data);
 
 	ast_module_user_remove(u);
 

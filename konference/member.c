@@ -91,7 +91,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 		if (member->dtmf_star_menu)
 		{
 			ast_mutex_lock( &member->lock ) ;
-			if (f->subclass == '*')
+			if (AST_FRAME_SUBCLASS_INT(f) == '*')
 			{
 				member->star_pressed = 1;
 				DEBUG( "star was pressed\n" );
@@ -103,7 +103,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 				member->star_pressed = 0;
 				if (menu)
 				{
-					switch (f->subclass) {
+					switch (AST_FRAME_SUBCLASS_INT(f)) {
 					case '1' :
 						if (member->mute_audio == 0)
 						{
@@ -179,9 +179,9 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 				member->type,
 				member->uniqueid,
 				member->channel_name,
-				member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
-				member->chan->cid.cid_name ? member->chan->cid.cid_name : "unknown",
-				f->subclass,
+				ast_channel_callerid_number(member->chan),
+				ast_channel_callerid_name(member->chan),
+				AST_FRAME_SUBCLASS_INT(f),
 				conf->membercount,
 				member->flags,
 				member->mute_audio
@@ -279,7 +279,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 		//
 		if (
 			member->dsp != NULL
-			&& f->subclass == AST_CONF_FORMAT
+			&& AST_FRAME_SUBCLASS_CODEC(f) == AST_CONF_FORMAT
 			&& f->datalen == AST_CONF_FRAME_DATA_SIZE
 			)
 		{
@@ -334,7 +334,7 @@ static int process_incoming(struct ast_conf_member *member, struct ast_conferenc
 #endif
 	else if (
 		f->frametype == AST_FRAME_CONTROL
-		&& f->subclass == AST_CONTROL_HANGUP
+		&& AST_FRAME_SUBCLASS_INT(f) == AST_CONTROL_HANGUP
 		)
 	{
 		// hangup received
@@ -476,7 +476,7 @@ again2:
 	// if we get here, we've gotten to the end of the queue; reset write format
 	if ( ast_set_write_format( member->chan, member->write_format ) < 0 )
 	{
-		ast_log( LOG_ERROR, "unable to set write format to %d\n",
+		ast_log( LOG_ERROR, "unable to set write format to " AST_FMT_FORMAT_T "\n",
 		    member->write_format ) ;
 	}
     } else {
@@ -674,7 +674,7 @@ static int process_outgoing(struct ast_conf_member *member)
 // main member thread function
 //
 
-int member_exec( struct ast_channel* chan, void* data )
+int member_exec( struct ast_channel* chan, const char* data )
 {
 //	struct timeval start, end ;
 //	start = ast_tvnow();
@@ -828,8 +828,8 @@ int member_exec( struct ast_channel* chan, void* data )
 		member->id,
 		member->flags,
 		member->channel_name,
-		member->chan->cid.cid_num ? member->chan->cid.cid_num : "unknown",
-		member->chan->cid.cid_name ? member->chan->cid.cid_name: "unknown",
+		ast_channel_callerid_number(member->chan),
+		ast_channel_callerid_name(member->chan),
 		(member->mute_audio == 0 ? "False" : "True"),
 		(member->speaking_state == 1 ? "True" : "False"),
 		conf->stats.moderators,
@@ -1001,7 +1001,7 @@ struct ast_conf_member *check_active_video( int id, struct ast_conference *conf 
 }
 #endif
 
-static int convert_format_to_index(int format)
+static int convert_format_to_index(format_t format)
 {
 	switch ( format )
 	{
@@ -2961,8 +2961,8 @@ void send_state_change_notifications( struct ast_conf_member* member )
 struct ast_packer {
 	int framesize; // number of frames per packet on the wire.
 	int size;
+	format_t format;
 	int packet_index;
-	int format;
 	int readdata;
 	int optimizablestream;
 	int flags;
@@ -3014,10 +3014,12 @@ int ast_packer_feed(struct ast_packer *s, const struct ast_frame *f)
 		return -1;
 	}
 	if (!s->format) {
-		s->format = f->subclass;
+		s->format = AST_FRAME_SUBCLASS_CODEC(f);
 		s->samples=0;
-	} else if (s->format != f->subclass) {
-		ast_log(LOG_WARNING, "Packer was working on %d format frames, now trying to feed %d?\n", s->format, f->subclass);
+	} else if (s->format != AST_FRAME_SUBCLASS_CODEC(f)) {
+		ast_log(LOG_WARNING, "Packer was working on " AST_FMT_FORMAT_T " format frames, "
+				     "now trying to feed " AST_FMT_FORMAT_T "?\n",
+			s->format, AST_FRAME_SUBCLASS_CODEC(f));
 		return -1;
 	}
 	if (s->len + f->datalen > PACKER_SIZE) {
@@ -3066,7 +3068,7 @@ struct ast_frame *ast_packer_read(struct ast_packer *s)
 		len = s->len;
 	/* Make frame */
 	s->f.frametype = AST_FRAME_VOICE;
-	s->f.subclass = s->format;
+	AST_FRAME_SUBCLASS_CODEC(&s->f) = s->format;
 	SETDATA2PTR(s->f.data, s->framedata + AST_FRIENDLY_OFFSET);
 	s->f.offset = AST_FRIENDLY_OFFSET;
 	s->f.datalen = len;
@@ -3284,7 +3286,8 @@ int queue_frame_for_speaker(
 		// short-cut pointer to the ast_frame
 		qf = frame->fr ;
 
-		if ( (qf->subclass == member->write_format) && (member->listen_volume == 0) )
+		if ( (AST_FRAME_SUBCLASS_CODEC(qf) == member->write_format) &&
+		     (member->listen_volume == 0) )
 		{
 			// frame is already in correct format, so just queue it
 

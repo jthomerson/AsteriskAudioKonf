@@ -32,15 +32,10 @@
 #define _APP_CONF_COMMON_H
 
 #include <asterisk/time.h>
+#include <asterisk/version.h>
 
 // typedef includes
 #include "conf_frame.h"
-
-// function includesee
-//#include "member.h"
-#include "conference.h"
-#include "frame.h"
-#include "cli.h"
 
 /* Utility functions */
 
@@ -64,5 +59,47 @@
 #define CASTDATA2PTR(data, type) (type*)(*((long *)&(data)))
 
 const char *argument_delimiter ;
+
+// helper macros and functions to make building for different asterisk
+// versions easier
+#if ASTERISK_VERSION_NUM >= 10800
+#define AST_FRAME_SUBCLASS_INT(f)	((f)->subclass.integer)
+#define AST_FRAME_SUBCLASS_CODEC(f)	((f)->subclass.codec)
+#define AST_FMT_FORMAT_T		"%llu"
+
+static inline const char *ast_channel_callerid_number(struct ast_channel *chan)
+{
+	return S_COR(chan->caller.id.number.valid,
+		     chan->caller.id.number.str, "<unknown>");
+}
+
+static inline const char *ast_channel_callerid_name(struct ast_channel *chan)
+{
+	return S_COR(chan->caller.id.name.valid,
+		     chan->caller.id.name.str, "<unknown>");
+}
+#else
+typedef unsigned int format_t;
+
+#define AST_FRAME_SUBCLASS_INT(f)	((f)->subclass)
+#define AST_FRAME_SUBCLASS_CODEC(f)	((f)->subclass)
+#define AST_FMT_FORMAT_T		"%u"
+
+static inline const char *ast_channel_callerid_number(struct ast_channel *chan)
+{
+	return chan->cid.cid_num ? chan->cid.cid_num : "unknown";
+}
+
+static inline const char *ast_channel_callerid_name(struct ast_channel *chan)
+{
+	return chan->cid.cid_name ? chan->cid.cid_name : "unknown";
+}
+#endif
+
+// function includesee
+//#include "member.h"
+#include "conference.h"
+#include "frame.h"
+#include "cli.h"
 
 #endif

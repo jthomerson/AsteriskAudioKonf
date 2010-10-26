@@ -155,7 +155,7 @@ struct ast_conference
 
 int hash( const char *channel_name ) ;
 
-int count_exec( struct ast_channel* chan, void* data ) ;
+int count_exec( struct ast_channel* chan, const char *data ) ;
 
 struct ast_conference* join_conference( struct ast_conf_member* member, const char* recfile, const char* recformat ) ;
 
